@@ -1,2 +1,0 @@
-# miscprojects
-Miscellaneous small projects
