@@ -1,0 +1,8 @@
+﻿{
+  "BaseDir": "F:/Users/decha/OneDrive/ParkingLotImages",
+  "UseDateSubfolders": true,
+  "RetentionDays": 30,
+  "ZipYesterday": false,
+  "JpegQuality": "2",
+  "FfmpegTimeoutSec": 60
+}
