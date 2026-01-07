@@ -31,12 +31,37 @@ namespace ParkingLotImagesTray
         // Single housekeeping cron (local time). Default: 00:10 every day
         public string HousekeepingCron { get; set; } = "10 0 * * *";
 
-        public string LogPath => Path.Combine(BaseDir, "timelapse.log");
-        public string StatusPath => Path.Combine(BaseDir, "status.json");
+        public string LogPath => Path.Combine(AppDataDir, "timelapse.log");
+        public string StatusPath => Path.Combine(AppDataDir, "status.json");
 
-        public static AppConfig Load(string? exeDir = null)
+        public static string AppDataDir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ParkingLotImagesTray");
+        public static string SettingsPath => Path.Combine(AppDataDir, "ParkingLotImagesTray.settings.json");
+
+        public static AppConfig Load()
         {
             var cfg = new AppConfig();
+
+            try
+            {
+                // Ensure AppData directory exists
+                if (!Directory.Exists(AppDataDir))
+                {
+                    Directory.CreateDirectory(AppDataDir);
+                }
+
+                // Simple migration: if settings exists next to EXE but not in AppData, move it
+                var exeDir = AppDomain.CurrentDomain.BaseDirectory;
+                var oldSettingsPath = Path.Combine(exeDir, "ParkingLotImagesTray.settings.json");
+                if (File.Exists(oldSettingsPath) && !File.Exists(SettingsPath))
+                {
+                    try
+                    {
+                        File.Move(oldSettingsPath, SettingsPath);
+                    }
+                    catch { /* ignore migration errors */ }
+                }
+            }
+            catch { }
 
             try
             {
@@ -61,12 +86,10 @@ namespace ParkingLotImagesTray
 
             try
             {
-                // Load user JSON next to the EXE
-                exeDir ??= AppDomain.CurrentDomain.BaseDirectory;
-                var settingsPath = Path.Combine(exeDir, "ParkingLotImagesTray.settings.json");
-                if (File.Exists(settingsPath))
+                // Load user JSON from AppData
+                if (File.Exists(SettingsPath))
                 {
-                    var json = File.ReadAllText(settingsPath);
+                    var json = File.ReadAllText(SettingsPath);
                     var userCfg = JsonSerializer.Deserialize<UserSettings>(json, new JsonSerializerOptions
                     {
                         PropertyNameCaseInsensitive = true
