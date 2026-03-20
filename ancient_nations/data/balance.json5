@@ -1,0 +1,111 @@
+{
+  // ── Starting Resources ──────────────────────────────────────────────────────
+  "START_GOLD":  200,
+  "START_FOOD":  100,
+  "START_WOOD":  80,
+  "START_METAL": 60,
+
+  // ── Production rates ────────────────────────────────────────────────────────
+  "PROD_FARM":        4,    // food per farm tile per turn
+  "PROD_FOREST_TILE": 3,
+  "PROD_MINE":        2,
+  "PROD_GOLD_TILE":   1,
+
+  // ── Army Costs (base × level) ───────────────────────────────────────────────
+  "ARMY_COST_FOOD":  8,
+  "ARMY_COST_WOOD":  6,
+  "ARMY_COST_METAL": 6,
+  "ARMY_COST_GOLD":  15,   // only for levels > 3
+
+  "ARMY_UPKEEP_FOOD":  2,
+  "ARMY_UPKEEP_METAL": 1,
+  "ARMY_UPKEEP_GOLD":  1,
+
+  // ── Development Costs ───────────────────────────────────────────────────────
+  "DEV_FARM_WOOD":    20,
+  "DEV_FARM_FOOD":    5,
+  "DEV_MINE_WOOD":    15,
+  "DEV_MINE_METAL":   10,
+  "DEV_CASTLE_WOOD":  30,
+  "DEV_CASTLE_METAL": 40,
+  "DEV_ROAD_WOOD":    5,
+  "DEV_ROAD_METAL":   2,
+
+  // ── Towns ────────────────────────────────────────────────────────────────────
+  "TOWN_RADIUS":       [3, 5, 7],      // gathering radius by town level 1-3
+  "TOWN_MAX_ARMY_LVL": [3, 6, 10],    // max army level spawnable at each level
+  "TOWN_GROWTH_POP":   [60, 200, 600], // pop needed to reach levels 2, 3, 4
+  "POP_GROWTH_BASE":   3,
+  "POP_GROWTH_FOOD":   0.3,
+
+  // ── Gold ────────────────────────────────────────────────────────────────────
+  "GOLD_TRANSPORT_RATE": 10,
+
+  // ── Travel speeds (tiles per turn) ──────────────────────────────────────────
+  "SPD_PLAIN": 2,
+  "SPD_ROAD":  4,
+  "SPD_OCEAN": 1,
+  "SPD_RIVER": 6,
+
+  // ── Combat ──────────────────────────────────────────────────────────────────
+  "COMBAT_ATK_DICE":  3,
+  "COMBAT_DEF_DICE":  2,
+  "CASTLE_DEF_BONUS": 2,   // extra defender dice when in a castle
+
+  // ── Diplomacy ────────────────────────────────────────────────────────────────
+  "PEACE_MIN_TURNS":      8,
+  "WAR_COOLDOWN":         15,
+  "ALLIANCE_MAX":         2,   // max simultaneous alliances per nation
+  "ALLIANCE_COOLDOWN":    25,  // turns before re-allying after mutual break
+  "ALLIANCE_BETRAYAL_CD": 40,  // longer cooldown after betrayal
+
+  // Alliance tiers: turns of continuous alliance required to reach each tier
+  "ALLIANCE_TIER_AGES":  [0, 15, 30, 50, 75],
+
+  // Mutual-defence trigger chance per tier (indexed 0-4)
+  "ALLIANCE_MUTUAL_DEF": [0.40, 0.40, 0.65, 0.65, 0.65],
+
+  // Resource dividend per turn (food/wood/metal) both allies receive, by tier
+  "ALLIANCE_DIVIDEND": [0, 5, 5, 8, 10],
+
+  // ── Betrayal mechanics ───────────────────────────────────────────────────────
+  "BETRAYAL_PLUNDER_RATE":    0.15, // fraction of ally's gold+metal stolen
+  "BETRAYAL_REP_TURNS":       60,   // turns others are wary of allying a betrayer
+  "BETRAYAL_SURGE_TURNS":     10,   // turns of +1 attacker dice after betrayal
+  "BETRAYAL_ALLY_CHANCE_MOD": 0.50, // chance modifier vs a known betrayer
+
+  // ── AI thresholds ────────────────────────────────────────────────────────────
+  "AI_AGGRO_RATIO":  1.4,   // attack if strength > enemy × this
+  "AI_LOW_RESOURCE": 40,    // expand toward resources below this
+  "AI_HIGH_RESOURCE": 200,
+  "AI_TRADE_CHANCE": 0.25,
+  "AI_ALLY_CHANCE":  0.07,  // base chance per turn to propose alliance
+
+  // ── Peaceful Union / Annexation ──────────────────────────────────────────────
+  // Two very long-allied nations may vote to merge.  The larger absorbs the smaller.
+  "UNION_VOTE_MIN_AGE":    90,   // alliance must be this many turns old to trigger
+  "UNION_VOTE_CHANCE":     0.02, // per-turn probability of calling the vote (when eligible)
+  "UNION_SUCCESS_CHANCE":  0.40, // probability the vote passes
+  "UNION_FAIL_BAD_CHANCE": 0.20, // probability the vote fails badly (war!)
+  // Rebellion cooldown for the absorbed nation (longer than surrender — it was willing)
+  "UNION_COOLDOWN_TURNS":  80,
+
+  // ── Surrender / Vassalage ────────────────────────────────────────────────────
+  // A desperate nation at war may surrender and be absorbed by its strongest enemy.
+  "SURRENDER_TILE_THRESHOLD": 8,    // tiles remaining — below this, consider surrendering
+  "SURRENDER_STRENGTH_RATIO": 0.15, // army strength ratio vs strongest enemy to trigger
+  "SURRENDER_CHANCE":         0.08, // per-turn probability of actually surrendering
+  // How long before the absorbed nation's slot can spawn a rebellion
+  "REBELLION_COOLDOWN_TURNS": 50,
+
+  // ── Nations ──────────────────────────────────────────────────────────────────
+  "NUM_NATIONS":         6,
+  "MIN_NATION_DISTANCE": 28,
+
+  // ── Display ──────────────────────────────────────────────────────────────────
+  "LOG_MAX":       300,
+  "CHART_HISTORY": 200,
+  "TURN_DELAY":    0.5,    // seconds per turn (default speed)
+  "WINDOW_WIDTH":  130,
+  "WINDOW_HEIGHT": 42,
+}
