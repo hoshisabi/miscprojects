@@ -1,0 +1,87 @@
+{
+  // World event definitions.
+  // rarity      = average turns between occurrences (higher = rarer)
+  // cooldown_div = rarity is divided by this to get per-event cooldown turns
+  // label       = prefix shown in log messages
+  "events": {
+    "earthquake": {
+      "rarity": 80,
+      "cooldown_div": 3,
+      "label": "QUAKE",
+      "description": "The earth shakes, collapsing buildings and damaging armies.",
+    },
+    "flood": {
+      "rarity": 50,
+      "cooldown_div": 3,
+      "label": "FLOOD",
+      "description": "Rising waters drown farms and reshape the landscape temporarily.",
+    },
+    "drought": {
+      "rarity": 60,
+      "cooldown_div": 3,
+      "label": "DROUGHT",
+      "description": "Crops wither; nations near the epicentre lose food stocks.",
+    },
+    "plague": {
+      "rarity": 90,
+      "cooldown_div": 3,
+      "label": "PLAGUE",
+      "description": "Disease spreads through towns and weakens armies.",
+    },
+    "gold_rush": {
+      "rarity": 70,
+      "cooldown_div": 3,
+      "label": "GOLD",
+      "description": "New gold deposits discovered — incentivises territorial expansion.",
+    },
+    "forest_fire": {
+      "rarity": 45,
+      "cooldown_div": 3,
+      "label": "FIRE",
+      "description": "Forests burn to plains, destroying farms and wood deposits.",
+    },
+    "volcanic_ash": {
+      "rarity": 110,
+      "cooldown_div": 4,
+      "label": "VOLCANO",
+      "description": "Ash cloud from a volcano turns fertile land to desert.",
+    },
+    "rich_vein": {
+      "rarity": 55,
+      "cooldown_div": 3,
+      "label": "VEIN",
+      "description": "A rich metal vein is discovered, drawing armies to the region.",
+    },
+    "migration": {
+      "rarity": 40,
+      "cooldown_div": 3,
+      "label": "MIGR",
+      "description": "A population wave swells the nearest nation's largest town.",
+    },
+    "assassination": {
+      "rarity": 120,
+      "cooldown_div": 4,
+      "label": "ASSASSIN",
+      "description": "A nation's leader is killed. The successor may bring a different vision.",
+      // change_chance: probability the new leader has a different trait (0.0-1.0)
+      "change_chance": 0.5,
+    },
+    "rebellion": {
+      // Only fires when at least one nation slot has been eliminated.
+      // Every alive nation has a size-based chance; nations are checked most-likely
+      // to least-likely and the first to pass its roll becomes the fractured parent.
+      // If no nation passes, no rebellion fires this cycle.
+      "rarity": 80,
+      "cooldown_div": 5,
+      "label": "REBEL",
+      "description": "An empire fractures. A rebel state rises from its distant territory.",
+      // min_tiles: parent must hold at least this many tiles to be split
+      "min_tiles": 30,
+      // split_fraction: fraction of parent tiles given to the rebel
+      "split_fraction": 0.33,
+      // tiles_scale: nation with this many tiles has a ~50% base rebellion chance;
+      // smaller nations have proportionally less, larger nations approach the cap.
+      "tiles_scale": 5000,
+    },
+  },
+}

@@ -1,0 +1,72 @@
+{
+  // Nation traits — each nation is randomly assigned one at game start.
+  // A leader assassination event may reassign a nation's trait.
+  //
+  // Numeric fields and their defaults if absent:
+  //   army_cost_mul      1.0   — multiplier on army build costs
+  //   atk_dice_bonus     0     — extra attacker dice in combat
+  //   def_dice_bonus     0     — extra defender dice in combat
+  //   castle_def_bonus   0     — extra dice on top of normal castle bonus
+  //   trade_mul          1.0   — multiplier on resources exchanged per trade
+  //   gold_income_mul    1.0   — multiplier on gold deposit yields
+  //   food_yield_mul     1.0   — multiplier on all food collection (farms, rivers, deposits)
+  //   dev_cost_mul       1.0   — multiplier on farm/mine/road/castle wood costs
+  //   alliance_age_mul   1.0   — how fast alliance age increments (tier speed)
+  //   betrayal_rep_mul      1.0   — multiplier on betrayal reputation duration
+  //   town_radius_bonus     0     — flat bonus tiles added to every town's radius
+  //   rebellion_prone_mul   1.0   — multiplier on per-turn rebellion chance (>1 = more prone)
+  "traits": [
+    {
+      "id": "militarist",
+      "name": "Militarist",
+      "description": "Warriors born for conquest. Armies are cheaper and hit harder.",
+      "army_cost_mul": 0.8,
+      "atk_dice_bonus": 1,
+    },
+    {
+      "id": "merchant",
+      "name": "Merchant",
+      "description": "Masters of trade. Deals are more lucrative and gold flows freely.",
+      "trade_mul": 2.0,
+      "gold_income_mul": 1.5,
+    },
+    {
+      "id": "builder",
+      "name": "Builder",
+      "description": "Architects of civilization. Construction costs less and towns reach further.",
+      "dev_cost_mul": 0.7,
+      "town_radius_bonus": 1,
+    },
+    {
+      "id": "diplomat",
+      "name": "Diplomat",
+      "description": "Weavers of alliances. Bonds grow stronger faster and shame fades sooner.",
+      "alliance_age_mul": 2.0,
+      "betrayal_rep_mul": 0.5,
+    },
+    {
+      "id": "fortifier",
+      "name": "Fortifier",
+      "description": "Masters of defense. Castles are formidable and defenders hold the line.",
+      "def_dice_bonus": 1,
+      "castle_def_bonus": 2,
+    },
+    {
+      "id": "expansionist",
+      "name": "Expansionist",
+      "description": "Hungry for land. Towns claim wider territory and armies are easier to field.",
+      "town_radius_bonus": 2,
+      "army_cost_mul": 0.9,
+    },
+    {
+      "id": "zealot",
+      "name": "Zealot",
+      "description": "Servants of the divine. Sacred fields overflow with grain and warriors fight with holy fury — but heathens make poor trade partners, and broken oaths are never forgotten.",
+      "food_yield_mul": 1.4,
+      "atk_dice_bonus": 1,
+      "trade_mul": 0.7,
+      "betrayal_rep_mul": 2.0,
+      "rebellion_prone_mul": 1.8,
+    },
+  ],
+}
