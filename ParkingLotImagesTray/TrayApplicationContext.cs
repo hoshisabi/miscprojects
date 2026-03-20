@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -38,7 +39,7 @@ namespace ParkingLotImagesTray
             
             _notifyIcon = new NotifyIcon()
             {
-                Icon = System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath),
+                Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application,
                 ContextMenuStrip = new ContextMenuStrip(),
                 Visible = true,
                 Text = "Parking Lot Image Capture"
@@ -426,6 +427,12 @@ namespace ParkingLotImagesTray
 
         private void Housekeeping()
         {
+            if (!_config.ZipYesterday || !_config.UseDateSubfolders)
+            {
+                Log("Housekeeping skipped: ZipYesterday and UseDateSubfolders must both be enabled");
+                return;
+            }
+            
             Log("Starting housekeeping");
             ZipYesterday();
             PruneOld();
