@@ -12,6 +12,7 @@ from ai import NationAI
 from combat import resolve_battle
 from events import EventSystem
 from loader import load_json5
+from namegen import NationNameGenerator
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -47,8 +48,9 @@ class Game:
         random.shuffle(self._trait_pool)
 
         # Nations
-        self.nations  : list[Nation] = []
-        self.combat   = CombatManager(self)
+        self.nations    : list[Nation] = []
+        self.combat     = CombatManager(self)
+        self._namegen   = NationNameGenerator()
         self._spawn_nations(num_nations)
 
         # AI controllers
@@ -74,7 +76,7 @@ class Game:
                 dist_ok = all(math.dist((x,y),(sx,sy)) >= MIN_NATION_DISTANCE
                                for sx,sy in spawned)
                 if dist_ok:
-                    nation = Nation(i, NATION_NAMES[i], NATION_COLORS[i], x, y,
+                    nation = Nation(i, self._namegen.generate(), NATION_COLORS[i], x, y,
                                     self.world)
                     nation.trait = self._trait_pool[i % len(self._trait_pool)]
                     self.nations.append(nation)
@@ -93,7 +95,7 @@ class Game:
                              default=float('inf'))
                     if d > best_dist:
                         best_dist=d; bx,by=px,py
-                nation = Nation(i, NATION_NAMES[i], NATION_COLORS[i], bx, by,
+                nation = Nation(i, self._namegen.generate(), NATION_COLORS[i], bx, by,
                                 self.world)
                 nation.trait = self._trait_pool[i % len(self._trait_pool)]
                 self.nations.append(nation)
@@ -204,7 +206,8 @@ class Game:
         for n in self.nations:
             if not n.alive: continue
             if len(n.tiles) == 0 or (not n.towns and not n.armies):
-                n.alive = False
+                n.alive      = False
+                n.death_turn = t
                 self.log(t, f"[DEAD] {n.name} has been ELIMINATED!", -1)
 
     # ── peaceful union ────────────────────────────────────────────────────
@@ -241,7 +244,9 @@ class Game:
         larger.trait = merged_trait
 
         # Eliminate with long cooldown (willing union → stable → slower to rebel)
-        smaller.alive = False
+        smaller.alive        = False
+        smaller.death_turn   = turn
+        smaller.absorbed_by  = larger.name
         smaller.rebellion_cooldown = UNION_COOLDOWN_TURNS
 
         self.log(turn,
@@ -277,7 +282,9 @@ class Game:
         loser.armies = []
 
         # Eliminate with cooldown (slot locked against rebellion)
-        loser.alive = False
+        loser.alive        = False
+        loser.death_turn   = turn
+        loser.absorbed_by  = winner.name
         loser.rebellion_cooldown = REBELLION_COOLDOWN_TURNS
 
         self.log(turn,
@@ -347,7 +354,9 @@ class Game:
         slot.alliance_age  = {}
         slot.betrayed_turns     = 0
         slot.army_surge_turns   = 0
-        slot.trait = random.choice(self.trait_list)
+        slot.name   = self._namegen.generate()
+        slot.letter = slot.name[0].upper()
+        slot.trait  = random.choice(self.trait_list)
         slot.history = {
             'territory': [], 'population': [], 'gold': [],
             'food': [], 'wood': [], 'metal': [],
