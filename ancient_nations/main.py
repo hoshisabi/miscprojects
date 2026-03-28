@@ -16,6 +16,12 @@ import sys
 import os
 import time
 
+# Ensure UTF-8 output on Windows
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8')
+
 # Colorama for Windows ANSI support
 try:
     import colorama

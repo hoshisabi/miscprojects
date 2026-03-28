@@ -24,8 +24,6 @@ MAP_SIZE   = 100
 OUTER_SIZE = 10
 INNER_SIZE = 10
 
-NATION_NAMES   = ['Romanus','Hellenikos','Persikos','Aegyptus','Phoenicia','Scythia']
-NATION_LETTERS = ['R', 'H', 'P', 'A', 'X', 'S']
 
 RESET = '\033[0m'
 BOLD  = '\033[1m'
