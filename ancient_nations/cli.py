@@ -48,6 +48,9 @@ def nation_dict(n, turn=0):
         'battles_lost':     n.history.get('battles_lost', 0),
         'trades_done':      n.history.get('trades_done', 0),
         'alliances_formed': n.history.get('alliances_formed', 0),
+        'trait':            n.trait['name'] if n.trait else None,
+        'death_turn':       n.death_turn,
+        'absorbed_by':      n.absorbed_by,
     }
 
 
@@ -178,7 +181,12 @@ def cmd_run(args):
 
     out = game_summary(g)
     out['battles'] = [battle_dict(b, [n.name for n in g.nations]) for b in g.battles]
-    _print(out, args.pretty)
+
+    if getattr(args, 'format', 'json') == 'narrative':
+        import narrative
+        sys.stdout.write(narrative.render(out) + '\n')
+    else:
+        _print(out, args.pretty)
 
 
 def cmd_query(args):
@@ -292,7 +300,7 @@ def cmd_map(args):
         for x in range(0, MAP_SIZE, 2): # sample every other col
             t = w.t(x, y)
             if t.owner >= 0:
-                row += NATION_LETTERS[t.owner]
+                row += g.nations[t.owner].letter
             else:
                 row += TERRAIN_CHARS[t.terrain]
         rows.append(row)
@@ -346,6 +354,8 @@ def build_parser():
 
     # run
     sp = sub.add_parser('run', parents=[shared], help='Run simulation and print final state')
+    sp.add_argument('--format', choices=['json', 'narrative'], default='json',
+                    help='Output format (default: json)')
 
     # query
     sq = sub.add_parser('query', parents=[shared], help='Query a specific aspect of state')
