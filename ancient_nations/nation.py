@@ -18,8 +18,10 @@ class Nation:
         self.idx        = idx
         self.name       = name
         self.color      = color
-        self.letter     = NATION_LETTERS[idx]
+        self.letter     = name[0].upper()
         self.alive      = True
+        self.death_turn  = None   # turn the nation was eliminated, or None
+        self.absorbed_by = None   # name of the nation that absorbed this one, or None
 
         # Resources (stockpile)
         self.res = {

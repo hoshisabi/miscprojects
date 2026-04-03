@@ -416,7 +416,7 @@ class Renderer:
             for i, v in enumerate(pts):
                 row = int((1 - (v - min_v) / rng) * (plot_h-1))
                 row = max(0, min(plot_h-1, row))
-                canvas[row][i] = (col, NATION_LETTERS[n.idx])
+                canvas[row][i] = (col, n.letter)
 
         lines = [f'  \033[97m{label}\033[0m  max:{int(max_v)}']
         for row in canvas:
