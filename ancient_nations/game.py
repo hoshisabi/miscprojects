@@ -106,11 +106,12 @@ class Game:
     def process_turn(self):
         self.turn += 1
         t = self.turn
+        season_food = self._season_food_mul()
 
         # 1. Resource collection
         for n in self.nations:
             if n.alive:
-                n.collect_resources(self.world)
+                n.collect_resources(self.world, season_food)
 
         # 1b. Alliance trade dividends (Tier 1+)
         self._apply_alliance_dividends(t)
@@ -136,6 +137,9 @@ class Game:
             if ai.n.alive:
                 ai.tick(t)
 
+        # 3b. Territory far from any town slowly reverts to neutral (carrying cost)
+        self._tick_territory_abandonment(t)
+
         # 4. Pay upkeep
         for n in self.nations:
             if not n.alive: continue
@@ -148,6 +152,9 @@ class Game:
                     if not victim.is_alive():
                         self.ai[n.idx]._remove_army(victim)
                         self.log(t, f"  {n.name}'s army starved!", n.idx)
+
+        # 4b. Famine: prolonged national food stress downgrades towns
+        self._tick_famine_towns(t)
 
         # 5. World events
         new_evts = self.events.tick(t)
@@ -203,6 +210,71 @@ class Game:
                 still_pending.append((due_turn, cx, cy, radius, rtype))
         self.pending_recoveries = still_pending
 
+    def _season_food_mul(self):
+        """Alternating wet / dry halves affect food gathering (not deposits/gold)."""
+        if SEASON_LENGTH_TURNS <= 0:
+            return 1.0
+        half = SEASON_LENGTH_TURNS
+        phase = (self.turn - 1) % (2 * half)
+        return SEASON_FOOD_MUL_WET if phase < half else SEASON_FOOD_MUL_DRY
+
+    def _tick_territory_abandonment(self, t):
+        """Tiles not covered by any friendly town gathering radius drift back to neutral."""
+        for n in self.nations:
+            if not n.alive:
+                continue
+            covered = set()
+            bonus = n.trait_val('town_radius_bonus', 0)
+            for town in n.towns:
+                r = town.radius + bonus
+                for tile in self.world.tiles_in_radius(town.x, town.y, r):
+                    if tile.owner == n.idx:
+                        covered.add((tile.x, tile.y))
+            for xy in list(n.tiles):
+                tile = self.world.t(xy[0], xy[1])
+                if xy in covered:
+                    tile.territory_neglect = 0
+                    continue
+                tile.territory_neglect += 1
+                if tile.territory_neglect >= TERRITORY_NEGLECT_ABANDON_TURNS:
+                    self._abandon_tile_to_neutral(n, tile, t)
+
+    def _abandon_tile_to_neutral(self, nation, tile, t):
+        nation.tiles.discard((tile.x, tile.y))
+        tile.owner = -1
+        tile.territory_neglect = 0
+        tile.captured_turn = -1
+        if tile.town is None and tile.entity is not None:
+            tile.entity = None
+        tile.road = False
+        self.log(t,
+            f"  {nation.name} lost control of distant land ({tile.x},{tile.y})",
+            nation.idx)
+
+    def _tick_famine_towns(self, t):
+        """National food stress causes towns to lose levels over time."""
+        for n in self.nations:
+            if not n.alive:
+                continue
+            famine = n.res[RES_FOOD] <= FAMINE_FOOD_THRESHOLD
+            any_downgrade = False
+            for town in n.towns:
+                if famine:
+                    town.food_deficit_turns += 1
+                else:
+                    town.food_deficit_turns = 0
+                if (town.food_deficit_turns >= FAMINE_DOWNGRADE_TURNS
+                        and town.apply_famine_downgrade()):
+                    any_downgrade = True
+                    self.log(t,
+                        f"  {town.name} shrank to {town.level_name()} (famine)",
+                        n.idx)
+            if any_downgrade:
+                cap = n.capital
+                if cap:
+                    for tw in n.towns:
+                        tw.is_capital = (tw is cap)
+
     def _check_eliminations(self, t):
         for n in self.nations:
             if not n.alive: continue
@@ -220,7 +292,7 @@ class Game:
         """
         # Transfer tiles
         for xy in list(smaller.tiles):
-            self.world.t(xy[0], xy[1]).owner = larger.idx
+            self.world.set_tile_owner(xy[0], xy[1], larger.idx)
             larger.tiles.add(xy)
         smaller.tiles = set()
 
@@ -264,7 +336,7 @@ class Game:
         """
         # Transfer tiles
         for xy in list(loser.tiles):
-            self.world.t(xy[0], xy[1]).owner = winner.idx
+            self.world.set_tile_owner(xy[0], xy[1], winner.idx)
             winner.tiles.add(xy)
         loser.tiles = set()
 
@@ -318,7 +390,7 @@ class Game:
         # Transfer tile ownership
         for xy in rebel_tiles:
             parent.tiles.discard(xy)
-            self.world.t(xy[0], xy[1]).owner = dead_slots[0].idx
+            self.world.set_tile_owner(xy[0], xy[1], dead_slots[0].idx)
 
         # Transfer any towns inside rebel territory
         rebel_towns = []
@@ -345,6 +417,8 @@ class Game:
         slot = dead_slots[0]
         slot.slot_revivals += 1
         slot.alive         = True
+        slot.death_turn    = None
+        slot.absorbed_by   = None
         slot.tiles         = rebel_tiles
         slot.towns         = rebel_towns
         slot.armies        = rebel_armies
@@ -356,6 +430,7 @@ class Game:
         slot.alliance_age  = {}
         slot.betrayed_turns     = 0
         slot.army_surge_turns   = 0
+        slot.alliance_contradiction_turns = 0
         slot.name   = self._namegen.generate()
         slot.letter = slot.name[0].upper()
         slot.trait  = random.choice(self.trait_list)

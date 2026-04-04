@@ -90,6 +90,23 @@
   // Rebellion cooldown for the absorbed nation (longer than surrender — it was willing)
   "UNION_COOLDOWN_TURNS":  80,
 
+  // ── Territory integrity (Vesper/Wren: overextension / Scythia arc) ────────────
+  // Tiles not within any friendly town gathering radius accumulate neglect; then revert to neutral.
+  "TERRITORY_NEGLECT_ABANDON_TURNS": 14,
+
+  // National food stockpile at or below this after upkeep counts as famine for towns.
+  "FAMINE_FOOD_THRESHOLD":         8,
+  // Consecutive famine turns before a town loses one level (minimum level 1).
+  "FAMINE_DOWNGRADE_TURNS":        5,
+
+  // Seasonal food modifier alternates each half-period (wet / dry).
+  "SEASON_LENGTH_TURNS":           45,
+  "SEASON_FOOD_MUL_WET":           1.10,
+  "SEASON_FOOD_MUL_DRY":           0.88,
+
+  // Allied to both sides of a war: stress builds; weaker alliance (by age) breaks first.
+  "ALLIANCE_STRESS_BREAK_TURNS":   16,
+
   // ── Surrender / Vassalage ────────────────────────────────────────────────────
   // A desperate nation at war may surrender and be absorbed by its strongest enemy.
   "SURRENDER_TILE_THRESHOLD": 8,    // tiles remaining — below this, consider surrendering

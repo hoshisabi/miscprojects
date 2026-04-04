@@ -260,8 +260,13 @@ update both the JSON5 file and the explicit assignment in `constants.py`.
 
 ### CLI / Headless Mode
 
+On Windows, if `python` points at the Store stub, prefix every command with `uv run`:
+`uv run python cli.py run --seed 42 --turns 200`
+
 ```bash
 python cli.py run --turns 200 --seed 42                    # final summary JSON
+python cli.py run --turns 200 --seed 42 --no-events        # deterministic sim (no random events)
+python cli.py run --turns 200 --seed 42 --log-limit 200    # include up to 200 log entries (default 50)
 python cli.py stream --seed 42 --turns 200                 # NDJSON: one object per turn
 python cli.py stream --seed 42 --turns 800 --from 600      # same sim, only emit turns ≥ 600
 python cli.py query --seed 42 --turns 100 --nation Soron  # nation detail (prefix match on name)
@@ -273,5 +278,10 @@ python cli.py battles --seed 42 --turns 100                # full battle log
 ```
 
 Summary JSON includes per-nation **`trait`**, **`trait_id`**, **`slot_revivals`** (civil-war slot reuse count), and nation-level **`battles_won`** / **`battles_lost`**. Stream lines include the trait fields and **`slot_revivals`** on each nation row.
+
+Stream rows for dead nations zero out `territory`, `armies`, and `gold` so consumers aren't
+misled by draining tile counts. Dead nation rows also include `death_turn` (int) and
+`absorbed_by` (string or null) to explain how the slot was eliminated. Use `alive: false` as
+the reliable signal; the zeroed stats are just cosmetic honesty.
 
 The CLI is designed so an AI agent (or script) can consume the NDJSON stream and react to events.
