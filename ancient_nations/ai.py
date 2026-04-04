@@ -32,23 +32,30 @@ class NationAI:
 
     # ── diplomacy ─────────────────────────────────────────────────────────
     def _resolve_allied_to_both_sides_war(self, turn):
-        """If allied to both sides of a war, stress builds until the younger treaty breaks."""
+        """If allied to both sides of a war, stress builds until the youngest conflicted treaty breaks."""
         allies = self.n.allies()
-        if len(allies) != 2:
-            self.n.alliance_contradiction_turns = 0
-            return
-        a, b = allies[0], allies[1]
         g = self.game
-        if not (g.nations[a].alive and g.nations[b].alive):
+
+        # Find any pair of allies who are at war with each other
+        conflicted_pair = None
+        for i, a in enumerate(allies):
+            for b in allies[i+1:]:
+                if (g.nations[a].alive and g.nations[b].alive
+                        and g.nations[a].at_war_with(b)):
+                    conflicted_pair = (a, b)
+                    break
+            if conflicted_pair:
+                break
+
+        if not conflicted_pair:
             self.n.alliance_contradiction_turns = 0
             return
-        if not g.nations[a].at_war_with(b):
-            self.n.alliance_contradiction_turns = 0
-            return
+
+        a, b = conflicted_pair
         age_a = self.n.alliance_age.get(a, 0)
         age_b = self.n.alliance_age.get(b, 0)
         younger = a if age_a <= age_b else b
-        older = b if younger == a else a
+        older   = b if younger == a else a
         self.n.alliance_contradiction_turns += 1
         if self.n.alliance_contradiction_turns < ALLIANCE_STRESS_BREAK_TURNS:
             return
