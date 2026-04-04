@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Drawing;
 using System.IO;
 using System.IO.Compression;
@@ -442,15 +443,14 @@ namespace ParkingLotImagesTray
 
         private void Housekeeping()
         {
-            if (!_config.ZipYesterday || !_config.UseDateSubfolders)
-            {
-                Log("Housekeeping skipped: ZipYesterday and UseDateSubfolders must both be enabled");
-                return;
-            }
-            
             Log("Starting housekeeping");
-            ZipYesterday();
-            PruneOld();
+            if (_config.ZipYesterday && _config.UseDateSubfolders)
+                ZipYesterday();
+            else if (_config.ZipYesterday)
+                Log("Zip skipped: ZipYesterday requires UseDateSubfolders (day folders).");
+
+            if (_config.EnableRetentionPrune && _config.RetentionDays > 0)
+                PruneOld();
         }
 
         private void ZipYesterday()
@@ -507,54 +507,74 @@ namespace ParkingLotImagesTray
             }
         }
 
+        /// <summary>Day folders and zips use the same strict name as capture output: yyyy-MM-dd.</summary>
+        private static bool TryParseCaptureDayName(string name, out DateTime day)
+        {
+            return DateTime.TryParseExact(
+                name,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out day);
+        }
+
         private void PruneOld()
         {
             try
             {
-                var cutoff = DateTime.Now.AddDays(-_config.RetentionDays);
-                // Prune folders
+                // Calendar-day threshold: keep folders/zips for today and the prior (RetentionDays - 1) days when RetentionDays >= 1
+                var oldestKeep = DateTime.Today.AddDays(-_config.RetentionDays);
+
                 if (_config.UseDateSubfolders)
                 {
                     foreach (var dir in Directory.GetDirectories(_config.BaseDir))
                     {
                         var name = Path.GetFileName(dir);
-                        if (DateTime.TryParse(name, out var dt) && dt < cutoff)
-                        {
-                            try
-                            {
-                                Directory.Delete(dir, true);
-                                Log($"Pruned folder: {name}");
-                            }
-                            catch (UnauthorizedAccessException)
-                            {
-                                Log($"Prune skipped (access denied): {name}");
-                            }
-                            catch (Exception ex)
-                            {
-                                Log($"Prune folder error for {name}: {ex.Message}");
-                            }
-                        }
-                    }
-                }
-                // Prune zips
-                foreach (var file in Directory.GetFiles(_config.BaseDir, "*.zip"))
-                {
-                    var name = Path.GetFileNameWithoutExtension(file);
-                    if (DateTime.TryParse(name, out var dt) && dt < cutoff)
-                    {
+                        if (!TryParseCaptureDayName(name, out var folderDay))
+                            continue;
+                        if (folderDay.Date >= oldestKeep)
+                            continue;
+
+                        var zipSibling = Path.Combine(_config.BaseDir, name + ".zip");
+                        if (File.Exists(zipSibling))
+                            continue;
+
                         try
                         {
-                            File.Delete(file);
-                            Log($"Pruned zip: {Path.GetFileName(file)}");
+                            Directory.Delete(dir, true);
+                            Log($"Pruned folder: {name} (day before keep threshold {oldestKeep:yyyy-MM-dd})");
                         }
                         catch (UnauthorizedAccessException)
                         {
-                            Log($"Prune skipped (access denied): {Path.GetFileName(file)}");
+                            Log($"Prune skipped (access denied): {name}");
                         }
                         catch (Exception ex)
                         {
-                            Log($"Prune zip error for {Path.GetFileName(file)}: {ex.Message}");
+                            Log($"Prune folder error for {name}: {ex.Message}");
                         }
+                    }
+                }
+
+                foreach (var file in Directory.GetFiles(_config.BaseDir, "*.zip"))
+                {
+                    var name = Path.GetFileNameWithoutExtension(file);
+                    if (!TryParseCaptureDayName(name, out var zipDay))
+                        continue;
+                    if (zipDay.Date >= oldestKeep)
+                        continue;
+
+                    try
+                    {
+                        File.Delete(file);
+                        Log($"Pruned zip: {Path.GetFileName(file)} (before {oldestKeep:yyyy-MM-dd})");
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        Log($"Prune skipped (access denied): {Path.GetFileName(file)}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"Prune zip error for {Path.GetFileName(file)}: {ex.Message}");
                     }
                 }
             }

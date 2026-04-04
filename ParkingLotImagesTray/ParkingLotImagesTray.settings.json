@@ -1,5 +1,6 @@
 {
   "UseDateSubfolders": true,
+  "EnableRetentionPrune": false,
   "RetentionDays": 30,
   "ZipYesterday": false,
   "JpegQuality": "2",

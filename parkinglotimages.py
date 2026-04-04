@@ -38,6 +38,9 @@ def _default_base_dir() -> Path:
 BASE_DIR = _default_base_dir()
 USE_DATE_SUBFOLDERS = True
 RETENTION_DAYS = 30
+# Off by default so a wrong BASE_DIR cannot delete unrelated folders named yyyy-MM-dd.
+_ENABLE_PRUNE_RAW = (os.environ.get("PARKING_LOT_ENABLE_RETENTION_PRUNE") or "").strip().lower()
+ENABLE_RETENTION_PRUNE = _ENABLE_PRUNE_RAW in ("1", "true", "yes", "on")
 ZIP_YESTERDAY = False
 JPEG_QUALITY = "2"  # lower=better quality (1–31)
 FFMPEG_COMMON = ["-hide_banner", "-loglevel", "error", "-y", "-rw_timeout", "15000000"]
@@ -89,19 +92,24 @@ def get_out_dir(dt: datetime) -> Path:
 
 
 def prune_old():
-    if RETENTION_DAYS <= 0:
+    if not ENABLE_RETENTION_PRUNE or RETENTION_DAYS <= 0:
         return
-    cutoff = datetime.now() - timedelta(days=RETENTION_DAYS)
+    # Match tray app: calendar-day threshold (strict yyyy-MM-dd names only, via strptime).
+    today = datetime.now().date()
+    oldest_keep = today - timedelta(days=RETENTION_DAYS)
     try:
         for child in BASE_DIR.iterdir():
             try:
                 if USE_DATE_SUBFOLDERS and child.is_dir():
-                    dt = datetime.strptime(child.name, "%Y-%m-%d")
-                    if dt < cutoff and not (BASE_DIR / f"{child.name}.zip").exists():
-                        shutil.rmtree(child)
-                        logging.info("Pruned folder %s", child)
+                    day = datetime.strptime(child.name, "%Y-%m-%d").date()
+                    if day >= oldest_keep:
+                        continue
+                    if (BASE_DIR / f"{child.name}.zip").exists():
+                        continue
+                    shutil.rmtree(child)
+                    logging.info("Pruned folder %s (before keep threshold %s)", child.name, oldest_keep)
                 elif not USE_DATE_SUBFOLDERS and child.is_file() and child.suffix.lower() == ".jpg":
-                    if datetime.fromtimestamp(child.stat().st_mtime) < cutoff:
+                    if datetime.fromtimestamp(child.stat().st_mtime).date() < oldest_keep:
                         child.unlink(missing_ok=True)
             except ValueError:
                 continue
