@@ -29,6 +29,7 @@ class Town:
         self.roads_to    = []   # list of (x,y) connected towns
         self.army_queue  = 0    # turns until next army is ready
         self.build_queue = None # ('farm'|'mine'|'castle', tx, ty)
+        self.food_deficit_turns = 0  # consecutive turns nation lacked food (famine pressure)
 
     @property
     def radius(self):
@@ -51,6 +52,16 @@ class Town:
             self.level += 1
             return True   # levelled up
         return False
+
+    def apply_famine_downgrade(self):
+        """Lose one town level (min 1). Returns True if downgraded."""
+        if self.level <= 1:
+            return False
+        self.level -= 1
+        cap = TOWN_GROWTH_POP[self.level - 1] if self.level >= 1 else 20
+        self.population = max(20, min(self.population, cap - 1))
+        self.food_deficit_turns = 0
+        return True
 
     def level_name(self):
         names = {1:'Village',2:'Town',3:'Large Town',4:'City'}

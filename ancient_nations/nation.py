@@ -55,6 +55,9 @@ class Nation:
         # Set when the nation is absorbed via surrender; counts down while dead.
         self.rebellion_cooldown = 0
 
+        # Allied to two nations who are at war with each other — builds until break.
+        self.alliance_contradiction_turns = 0
+
         # How many times this nation *slot* was reactivated (e.g. civil-war rebel).
         # 0 = initial spawn; increments each time spawn_rebel_nation revives the slot.
         self.slot_revivals = 0
@@ -75,7 +78,7 @@ class Nation:
         cap.gold_local = 80
         self.towns.append(cap)
         world.t(capital_x, capital_y).town = cap
-        world.t(capital_x, capital_y).owner = idx
+        world.set_tile_owner(capital_x, capital_y, idx)
 
         # Claim starting territory (5x5 around capital)
         for dy in range(-4, 5):
@@ -84,7 +87,7 @@ class Nation:
                 if 0 <= nx < MAP_SIZE and 0 <= ny < MAP_SIZE:
                     t = world.t(nx, ny)
                     if t.terrain != TERRAIN_OCEAN:
-                        t.owner = idx
+                        world.set_tile_owner(nx, ny, idx)
                         self.tiles.add((nx, ny))
 
         self._world = world
@@ -239,7 +242,7 @@ class Nation:
         return {RES_FOOD: ARMY_UPKEEP_FOOD * n}
 
     # ── resource collection ────────────────────────────────────────────────
-    def collect_resources(self, world):
+    def collect_resources(self, world, season_food_mul=1.0):
         """Gather resources from tiles in gathering radius of each town.
         Owned tiles: full yield. Neutral tiles in radius: 40%.
         Allied tiles in radius: 60% (access granted by ally).
@@ -265,7 +268,7 @@ class Nation:
 
                 d = tile.deposits
                 gold_mul = self.trait_val('gold_income_mul', 1.0)
-                food_mul = self.trait_val('food_yield_mul', 1.0)
+                food_mul = self.trait_val('food_yield_mul', 1.0) * season_food_mul
                 if tile.entity == 'farm' and owned:
                     self.res[RES_FOOD] += PROD_FARM * food_mul
                 elif tile.terrain == TERRAIN_RIVER and tile.entity != 'mine':
