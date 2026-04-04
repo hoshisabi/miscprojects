@@ -21,8 +21,9 @@ namespace ParkingLotImagesTray
         private FileSystemWatcher? _settingsWatcher;
         
         // Config
-        private const string FFMPEG = "ffmpeg"; // executable name/path
         private const string LATEST_JPG = "latest.jpg";
+        /// <summary>Cron fields (minute hour …) are evaluated in this zone to match the Python scheduler.</summary>
+        private static readonly TimeZoneInfo ScheduleTimeZone = TimeZoneInfo.Local;
         private AppConfig _config = AppConfig.Load();
         private string LOG_PATH => _config.LogPath;
         private string STATUS_PATH => _config.StatusPath;
@@ -144,7 +145,7 @@ namespace ParkingLotImagesTray
         {
             lock (_scheduleLock)
             {
-                var now = DateTime.UtcNow;
+                var nowUtc = DateTime.UtcNow;
                 DateTime? nextRun = null;
 
                 var allCrons = _jobs.Select(j => j.Cron).ToList();
@@ -155,7 +156,7 @@ namespace ParkingLotImagesTray
 
                 foreach (var cron in allCrons)
                 {
-                    var next = cron.GetNextOccurrence(now);
+                    var next = cron.GetNextOccurrence(nowUtc, ScheduleTimeZone);
                     if (next.HasValue)
                     {
                         if (!nextRun.HasValue || next.Value < nextRun.Value)
@@ -167,7 +168,7 @@ namespace ParkingLotImagesTray
 
                 if (nextRun.HasValue)
                 {
-                    var delay = nextRun.Value - now;
+                    var delay = nextRun.Value - nowUtc;
                     if (delay < TimeSpan.Zero) delay = TimeSpan.Zero; // If it's in the past, run now
                     _schedulerTimer.Change(delay, Timeout.InfiniteTimeSpan);
                     Log($"Next job scheduled for: {nextRun.Value.ToLocalTime()} (in {delay.TotalSeconds:F0}s)");
@@ -182,16 +183,16 @@ namespace ParkingLotImagesTray
 
         private void SchedulerTick(object? state)
         {
-            var now = DateTime.UtcNow;
-            var utcNowMinusGrace = now.AddSeconds(-5); // 5-second grace period
+            var nowUtc = DateTime.UtcNow;
+            var utcNowMinusGrace = nowUtc.AddSeconds(-5); // 5-second grace period
             
             lock (_scheduleLock)
             {
                 // Capture jobs
                 foreach (var job in _jobs)
                 {
-                    var nextOccurrence = job.Cron.GetNextOccurrence(utcNowMinusGrace);
-                    if (nextOccurrence.HasValue && nextOccurrence.Value <= now)
+                    var nextOccurrence = job.Cron.GetNextOccurrence(utcNowMinusGrace, ScheduleTimeZone);
+                    if (nextOccurrence.HasValue && nextOccurrence.Value <= nowUtc)
                     {
                         Log($"Running job {job.Id}");
                         Task.Run(CaptureOne);
@@ -201,8 +202,8 @@ namespace ParkingLotImagesTray
                 // Housekeeping job
                 if (_housekeepingCron != null)
                 {
-                    var nextOccurrence = _housekeepingCron.GetNextOccurrence(utcNowMinusGrace);
-                    if (nextOccurrence.HasValue && nextOccurrence.Value <= now)
+                    var nextOccurrence = _housekeepingCron.GetNextOccurrence(utcNowMinusGrace, ScheduleTimeZone);
+                    if (nextOccurrence.HasValue && nextOccurrence.Value <= nowUtc)
                     {
                         Task.Run(Housekeeping);
                     }
@@ -348,20 +349,30 @@ namespace ParkingLotImagesTray
                 string finalPath = Path.Combine(outDir, finalName);
                 string tmpPath = Path.Combine(outDir, finalName + ".part");
 
-                var args = new List<string>(_config.FfmpegCommon);
-                args.AddRange(new[] { "-i", _config.StreamUrl, "-f", "image2", "-vcodec", "mjpeg", "-q:v", _config.JpegQuality, "-vframes", "1", tmpPath });
-
                 for (int attempt = 1; attempt <= 3; attempt++)
                 {
+                    TryDeletePartFile(tmpPath);
                     try
                     {
                         PreventSleep();
                         using (var process = new Process())
                         {
-                            process.StartInfo.FileName = FFMPEG;
-                            process.StartInfo.Arguments = string.Join(" ", args);
+                            process.StartInfo.FileName = _config.FfmpegExe;
                             process.StartInfo.UseShellExecute = false;
                             process.StartInfo.CreateNoWindow = true;
+                            foreach (var a in _config.FfmpegCommon)
+                                process.StartInfo.ArgumentList.Add(a);
+                            process.StartInfo.ArgumentList.Add("-i");
+                            process.StartInfo.ArgumentList.Add(_config.StreamUrl);
+                            process.StartInfo.ArgumentList.Add("-f");
+                            process.StartInfo.ArgumentList.Add("image2");
+                            process.StartInfo.ArgumentList.Add("-vcodec");
+                            process.StartInfo.ArgumentList.Add("mjpeg");
+                            process.StartInfo.ArgumentList.Add("-q:v");
+                            process.StartInfo.ArgumentList.Add(_config.JpegQuality);
+                            process.StartInfo.ArgumentList.Add("-vframes");
+                            process.StartInfo.ArgumentList.Add("1");
+                            process.StartInfo.ArgumentList.Add(tmpPath);
                             process.Start();
 
                             // Correctly handle timeout with CancellationToken
@@ -388,6 +399,7 @@ namespace ParkingLotImagesTray
                                     else
                                     {
                                         Log($"ffmpeg failed (attempt {attempt}/3, exit {process.ExitCode})");
+                                        TryDeletePartFile(tmpPath);
                                     }
                                 }
                                 catch (OperationCanceledException)
@@ -398,6 +410,7 @@ namespace ParkingLotImagesTray
                                         process.Kill();
                                     }
                                     Log($"ffmpeg timeout (attempt {attempt}/3)");
+                                    TryDeletePartFile(tmpPath);
                                 }
                             }
                         }
@@ -405,9 +418,11 @@ namespace ParkingLotImagesTray
                     catch (Exception ex)
                     {
                         Log($"Capture error (attempt {attempt}/3): {ex.Message}");
+                        TryDeletePartFile(tmpPath);
                     }
                     await Task.Delay(3000); // Wait before next retry
                 }
+                TryDeletePartFile(tmpPath);
                 WriteStatus(false, null, DateTime.Now, 0, "ffmpeg failed after retries");
             }
             catch (Exception ex)
@@ -585,7 +600,22 @@ namespace ParkingLotImagesTray
 
         private void PreventSleep()
         {
-            SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED);
+            var prev = SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED);
+            if (prev == 0)
+                Log("SetThreadExecutionState failed — system may still sleep during capture (privileges / power policy)");
+        }
+
+        private static void TryDeletePartFile(string path)
+        {
+            try
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+            catch
+            {
+                /* best effort */
+            }
         }
 
         private void ShowInfoDialog()

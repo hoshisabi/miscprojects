@@ -3,5 +3,7 @@
   "RetentionDays": 30,
   "ZipYesterday": false,
   "JpegQuality": "2",
-  "FfmpegTimeoutSec": 60
+  "FfmpegExe": "ffmpeg",
+  "FfmpegTimeoutSec": 60,
+  "HousekeepingCron": "10 3 * * *"
 }
