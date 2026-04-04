@@ -18,6 +18,8 @@ namespace ParkingLotImagesTray
         // User-editable settings (JSON). Default: PARKING_LOT_IMAGES_DIR env, else OneDrive\ParkingLotImages, else Pictures\ParkingLotImages.
         public string BaseDir { get; set; } = ResolveDefaultBaseDir();
         public bool UseDateSubfolders { get; set; } = true;
+        /// <summary>When false (default), retention pruning never runs — avoids accidental mass deletes if BaseDir is wrong.</summary>
+        public bool EnableRetentionPrune { get; set; } = false;
         public int RetentionDays { get; set; } = 30;
         public bool ZipYesterday { get; set; } = false;
         public string JpegQuality { get; set; } = "2";
@@ -122,6 +124,7 @@ namespace ParkingLotImagesTray
                     {
                         if (!string.IsNullOrWhiteSpace(userCfg.BaseDir)) cfg.BaseDir = userCfg.BaseDir!;
                         if (userCfg.UseDateSubfolders.HasValue) cfg.UseDateSubfolders = userCfg.UseDateSubfolders.Value;
+                        if (userCfg.EnableRetentionPrune.HasValue) cfg.EnableRetentionPrune = userCfg.EnableRetentionPrune.Value;
                         if (userCfg.RetentionDays.HasValue && userCfg.RetentionDays.Value > 0) cfg.RetentionDays = userCfg.RetentionDays.Value;
                         if (userCfg.ZipYesterday.HasValue) cfg.ZipYesterday = userCfg.ZipYesterday.Value;
                         if (!string.IsNullOrWhiteSpace(userCfg.JpegQuality)) cfg.JpegQuality = userCfg.JpegQuality!;
@@ -169,6 +172,7 @@ namespace ParkingLotImagesTray
         {
             public string? BaseDir { get; set; }
             public bool? UseDateSubfolders { get; set; }
+            public bool? EnableRetentionPrune { get; set; }
             public int? RetentionDays { get; set; }
             public bool? ZipYesterday { get; set; }
             public string? JpegQuality { get; set; }
