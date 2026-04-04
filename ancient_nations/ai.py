@@ -31,8 +31,40 @@ class NationAI:
         self._trade_decisions(turn)
 
     # ── diplomacy ─────────────────────────────────────────────────────────
+    def _resolve_allied_to_both_sides_war(self, turn):
+        """If allied to both sides of a war, stress builds until the younger treaty breaks."""
+        allies = self.n.allies()
+        if len(allies) != 2:
+            self.n.alliance_contradiction_turns = 0
+            return
+        a, b = allies[0], allies[1]
+        g = self.game
+        if not (g.nations[a].alive and g.nations[b].alive):
+            self.n.alliance_contradiction_turns = 0
+            return
+        if not g.nations[a].at_war_with(b):
+            self.n.alliance_contradiction_turns = 0
+            return
+        age_a = self.n.alliance_age.get(a, 0)
+        age_b = self.n.alliance_age.get(b, 0)
+        younger = a if age_a <= age_b else b
+        older = b if younger == a else a
+        self.n.alliance_contradiction_turns += 1
+        if self.n.alliance_contradiction_turns < ALLIANCE_STRESS_BREAK_TURNS:
+            return
+        self.n.alliance_contradiction_turns = 0
+        younger_n = g.nations[younger]
+        self.n.break_alliance(younger, betrayal=False)
+        if younger_n.alive and younger_n.allied_with(self.n.idx):
+            younger_n.break_alliance(self.n.idx, betrayal=False)
+        self.game.log(turn,
+            f"[DIPLO] {self.n.name} ends alliance with {younger_n.name} "
+            f"(divided loyalty vs {g.nations[older].name})",
+            self.n.idx)
+
     def _tick_diplomacy(self, turn):
         self.n.tick_diplomacy()
+        self._resolve_allied_to_both_sides_war(turn)
         my_str = self.n.army_strength() or 1
 
         for other in self.game.nations:
@@ -456,7 +488,7 @@ class NationAI:
         if prev_owner >= 0:
             prev_nation = self.game.nations[prev_owner]
             prev_nation.tiles.discard((tile.x, tile.y))
-        tile.owner = self.n.idx
+        self.world.set_tile_owner(tile.x, tile.y, self.n.idx)
         tile.captured_turn = turn
         self.n.tiles.add((tile.x, tile.y))
         # Transfer any town
@@ -486,7 +518,7 @@ class NationAI:
             r = town.radius + radius_bonus
             for tile in self.world.tiles_in_radius(town.x, town.y, r):
                 if tile.owner == -1 and tile.is_land():
-                    tile.owner = self.n.idx
+                    self.world.set_tile_owner(tile.x, tile.y, self.n.idx)
                     self.n.tiles.add((tile.x, tile.y))
 
     def _development_decisions(self, turn):
