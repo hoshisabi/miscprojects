@@ -7,12 +7,14 @@
 ## Bugs
 
 ### 1. `battles_won` / `battles_lost` always 0 in nation output
-`cli.py::nation_dict` reads `n.history['battles_won']` and `n.history['battles_lost']`, but
+**Fixed (2026-04):** `resolve_battle(..., nations=...)` increments nation `history` alongside army tallies.
+
+~~`cli.py::nation_dict` reads `n.history['battles_won']` and `n.history['battles_lost']`, but
 those keys are never incremented anywhere. `combat.py` increments `army.battles_won` and
 `army.battles_lost` on the individual army entities — the nation-level history is never updated.
 
 Either aggregate from armies when serialising, or increment `n.history['battles_won']` inside
-`combat.py` alongside the army increment.
+`combat.py` alongside the army increment.~~
 
 ### 2. Dead nations persist visibly in stream output
 After a nation dies, every subsequent NDJSON line still carries its entry with
@@ -30,28 +32,36 @@ the t1000 Romanus has nothing to do with the original one.
 Suggestion: append a suffix (e.g. `Romanus II`) or a `generation` field in the nation dict to
 distinguish lineages.
 
+**Partial mitigation (2026-04):** JSON now includes **`slot_revivals`** per nation (increments when a dead slot is revived as a rebel). Same name on the same slot index is still confusing in prose logs; the field helps agents line up NDJSON snapshots.
+
 ---
 
 ## CLI / Output
 
 ### 4. Nation trait not exposed in CLI output
-The trait (Militarist, Merchant, Fortifier, etc.) is visible in the GUI abbreviation and drives
+**Fixed (2026-04):** `nation_dict` and stream snapshots include **`trait`** (display name) and **`trait_id`**.
+
+~~The trait (Militarist, Merchant, Fortifier, etc.) is visible in the GUI abbreviation and drives
 meaningful bonuses, but neither `run`, `query --nation`, nor `stream` returns it. Would be useful
 for anyone trying to understand why one nation performs so differently from another — Phoenicia's
 83% attack win rate makes a lot more sense once you know their trait.
 
-Suggest adding `"trait": n.trait_id` (or similar) to `nation_dict`.
+Suggest adding `"trait": n.trait_id` (or similar) to `nation_dict`.~~
 
 ### 5. `map` command runs 100 turns by default
-The `map` command shares the `--turns 100` default with the other commands, which means
+**Fixed (2026-04):** `map` subparser sets **`turns=0`** by default.
+
+~~The `map` command shares the `--turns 100` default with the other commands, which means
 `uv run cli.py map --seed 42` runs a full 100-turn simulation before drawing the starting map.
 For map inspection, `--turns 0` is almost always the right default. Either give `map` its own
-default, or add a note in the help text.
+default, or add a note in the help text.~~
 
 ### 6. No time-range filtering on `stream` / `events`
-There's no way to ask "what happened between turn 600 and 800" without streaming all 800 turns
+**Fixed (2026-04):** **`stream --from T`** skips emitting lines until `turn >= T` (sim still runs from the start). **`query --from T`** filters the **`events`** list (with **`query --events`**, or the default full summary’s top-level events).
+
+~~There's no way to ask "what happened between turn 600 and 800" without streaming all 800 turns
 and discarding the first 600. A `--from N` flag on `stream` (skip output for turns < N) would be
-cheap to add and useful for investigating a specific era without re-reading the full history.
+cheap to add and useful for investigating a specific era without re-reading the full history.~~
 
 ---
 
@@ -193,8 +203,8 @@ Once the server architecture (issue 12) exists:
 |---|---|
 | `run` output | final nation state, all events with effects, last 50 logs |
 | `battles` output | full battle log with attacker/defender/winner/losses/turn |
-| `stream` output | per-turn territory, armies, gold, alive flag for all nations |
-| Nation `trait` | once exposed (issue 4), explains AI behaviour in prose |
+| `stream` output | per-turn territory, armies, gold, alive; **`trait`**, **`trait_id`**, **`slot_revivals`** per nation |
+| Nation `trait` / **`trait_id`** | exposed in `run`, `query`, and `stream` (issue 4 fixed) |
 
 ---
 

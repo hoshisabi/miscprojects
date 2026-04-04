@@ -15,7 +15,8 @@ def roll_dice(n, sides=DICE_SIDES):
 
 def resolve_battle(attacker, defender, def_tile, turn, log_fn,
                    atk_surge=False, tier4_def=False,
-                   atk_trait_dice=0, def_trait_dice=0):
+                   atk_trait_dice=0, def_trait_dice=0,
+                   nations=None):
     """
     Resolve a battle between two armies.
     Returns (winner, battle_record).
@@ -27,6 +28,11 @@ def resolve_battle(attacker, defender, def_tile, turn, log_fn,
     def_trait_dice – extra defender dice from nation trait (e.g. Fortifier)
     """
     def_nation = defender.nation if defender else -1
+
+    def _bump_nation(idx, won=0, lost=0):
+        if nations and idx >= 0:
+            nations[idx].history['battles_won'] += won
+            nations[idx].history['battles_lost'] += lost
 
     # Dice counts modified by level and traits
     atk_dice = COMBAT_ATK_DICE + max(0, attacker.level - 5) + atk_trait_dice
@@ -74,8 +80,10 @@ def resolve_battle(attacker, defender, def_tile, turn, log_fn,
     if defender is None or defender.health <= 0:
         winner = attacker.nation
         attacker.battles_won += 1
+        _bump_nation(attacker.nation, won=1)
         if defender:
             defender.battles_lost += 1
+            _bump_nation(defender.nation, lost=1)
         parts = []
         if castle_bonus: parts.append(f'Castle+{castle_bonus}')
         if atk_surge:    parts.append('Surge')
@@ -83,20 +91,28 @@ def resolve_battle(attacker, defender, def_tile, turn, log_fn,
     elif attacker.health <= 0:
         winner = def_nation
         attacker.battles_lost += 1
+        _bump_nation(attacker.nation, lost=1)
         if defender:
             defender.battles_won += 1
+            _bump_nation(defender.nation, won=1)
         notes = 'Defender held'
     else:
         # Both survive — attacker repelled if less health
         if attacker.health <= defender.health:
             winner = def_nation
             attacker.battles_lost += 1
-            if defender: defender.battles_won += 1
+            _bump_nation(attacker.nation, lost=1)
+            if defender:
+                defender.battles_won += 1
+                _bump_nation(defender.nation, won=1)
             notes = 'Repelled'
         else:
             winner = attacker.nation
             attacker.battles_won += 1
-            if defender: defender.battles_lost += 1
+            _bump_nation(attacker.nation, won=1)
+            if defender:
+                defender.battles_lost += 1
+                _bump_nation(defender.nation, lost=1)
             notes = 'Pyrrhic'
 
     b = Battle(

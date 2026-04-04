@@ -26,7 +26,8 @@ class CombatManager:
         return resolve_battle(attacker, defender, tile, turn, self.game.log,
                               atk_surge=atk_surge, tier4_def=tier4_def,
                               atk_trait_dice=atk_trait_dice,
-                              def_trait_dice=def_trait_dice)
+                              def_trait_dice=def_trait_dice,
+                              nations=self.game.nations)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -342,6 +343,7 @@ class Game:
 
         # Reactivate the slot
         slot = dead_slots[0]
+        slot.slot_revivals += 1
         slot.alive         = True
         slot.tiles         = rebel_tiles
         slot.towns         = rebel_towns
