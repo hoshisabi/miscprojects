@@ -11,9 +11,11 @@ Usage
   python cli.py query --seed 42 --turns 100 --tile 45,32
   python cli.py query --seed 42 --turns 100 --nation Romanus
   python cli.py query --seed 42 --turns 100 --region 3,4
-  python cli.py stream --seed 42 --turns 50   # NDJSON one line per turn
+  python cli.py query --seed 42 --turns 800 --events --from 600   # events with turn >= 600
+  python cli.py stream --seed 42 --turns 50            # NDJSON one line per turn
+  python cli.py stream --seed 42 --turns 200 --from 150   # only emit turns >= 150
   python cli.py battles --seed 42 --turns 200
-  python cli.py map    --seed 42              # ASCII world map (no simulation)
+  python cli.py map    --seed 42              # ASCII map: no turns simulated unless --turns set
 
 All commands write JSON (or NDJSON for stream) to stdout.
 Pass --pretty for human-readable indented JSON.
@@ -49,6 +51,8 @@ def nation_dict(n, turn=0):
         'trades_done':      n.history.get('trades_done', 0),
         'alliances_formed': n.history.get('alliances_formed', 0),
         'trait':            n.trait['name'] if n.trait else None,
+        'trait_id':         n.trait['id'] if n.trait else None,
+        'slot_revivals':    n.slot_revivals,
         'death_turn':       n.death_turn,
         'absorbed_by':      n.absorbed_by,
     }
@@ -147,11 +151,14 @@ def turn_summary(game):
         'turn': game.turn,
         'nations': [
             {
-                'name':      n.name,
-                'territory': len(n.tiles),
-                'armies':    n.total_armies(),
-                'gold':      round(n.res[RES_GOLD], 1),
-                'alive':     n.alive,
+                'name':          n.name,
+                'trait':         n.trait['name'] if n.trait else None,
+                'trait_id':      n.trait['id'] if n.trait else None,
+                'slot_revivals': n.slot_revivals,
+                'territory':     len(n.tiles),
+                'armies':        n.total_armies(),
+                'gold':          round(n.res[RES_GOLD], 1),
+                'alive':         n.alive,
             }
             for n in game.nations
         ],
@@ -194,6 +201,8 @@ def cmd_query(args):
     g = Game(seed=args.seed, num_nations=args.nations)
     for _ in range(args.turns):
         g.process_turn()
+
+    from_turn = getattr(args, 'from_turn', None)
 
     if args.tile:
         x, y = map(int, args.tile.split(','))
@@ -247,14 +256,21 @@ def cmd_query(args):
         }, args.pretty)
 
     elif args.events:
+        ev = g.events_history
+        if from_turn is not None:
+            ev = [e for e in ev if e.turn >= from_turn]
         _print({
             'turn':   g.turn,
-            'events': [e.to_dict() for e in g.events_history],
+            'events': [e.to_dict() for e in ev],
         }, args.pretty)
 
     else:
         # Default: full summary
-        _print(game_summary(g), args.pretty)
+        out = game_summary(g)
+        if from_turn is not None:
+            out['events'] = [e for e in out['events'] if e['turn'] >= from_turn]
+            out['events_total'] = len(out['events'])
+        _print(out, args.pretty)
 
 
 def cmd_stream(args):
@@ -264,8 +280,11 @@ def cmd_stream(args):
         for k in g.events._cooldowns:
             g.events._cooldowns[k] = 999999
 
+    from_turn = getattr(args, 'from_turn', None)
     for _ in range(args.turns):
         g.process_turn()
+        if from_turn is not None and g.turn < from_turn:
+            continue
         line = json.dumps(turn_summary(g))
         sys.stdout.write(line + '\n')
         sys.stdout.flush()
@@ -363,16 +382,21 @@ def build_parser():
     sq.add_argument('--nation',  type=str, help='Nation name (prefix match)')
     sq.add_argument('--region',  type=str, help='Outer region ox,oy')
     sq.add_argument('--events',  action='store_true', help='List all world events')
+    sq.add_argument('--from', dest='from_turn', type=int, default=None, metavar='T',
+                    help='With default query or --events: only include world events with turn >= T')
 
     # stream
-    sub.add_parser('stream', parents=[shared],
-                   help='Emit one JSON line per turn (NDJSON)')
+    st = sub.add_parser('stream', parents=[shared],
+                        help='Emit one JSON line per turn (NDJSON)')
+    st.add_argument('--from', dest='from_turn', type=int, default=None, metavar='T',
+                    help='Only emit lines for turns >= T (full sim still runs from start)')
 
     # battles
     sub.add_parser('battles', parents=[shared], help='Print full battle log')
 
     # map
     sm = sub.add_parser('map', parents=[shared], help='Print ASCII map and terrain info')
+    sm.set_defaults(turns=0)
 
     return p
 

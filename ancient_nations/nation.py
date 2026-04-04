@@ -55,6 +55,10 @@ class Nation:
         # Set when the nation is absorbed via surrender; counts down while dead.
         self.rebellion_cooldown = 0
 
+        # How many times this nation *slot* was reactivated (e.g. civil-war rebel).
+        # 0 = initial spawn; increments each time spawn_rebel_nation revives the slot.
+        self.slot_revivals = 0
+
         # Stats history (for charts)
         self.history = {
             'territory': [], 'population': [], 'gold': [],
