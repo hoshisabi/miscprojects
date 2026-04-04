@@ -19,7 +19,8 @@ from tzlocal import get_localzone
 
 # --- CONFIG ---
 STREAM_URL = "https://558312d54930d.streamlock.net/live/ccrb2.fois.axis.stream/playlist.m3u8"
-FFMPEG = "ffmpeg"  # or r"C:\ffmpeg\bin\ffmpeg.exe"
+_env_ff = (os.environ.get("PARKING_LOT_FFMPEG") or "").strip()
+FFMPEG = _env_ff or "ffmpeg"  # or set PARKING_LOT_FFMPEG to a full path
 
 
 def _default_base_dir() -> Path:

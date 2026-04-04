@@ -11,6 +11,8 @@ namespace ParkingLotImagesTray
     {
         // App.config (stable) keys
         public string StreamUrl { get; set; } = "https://558312d54930d.streamlock.net/live/ccrb2.fois.axis.stream/playlist.m3u8";
+        /// <summary>ffmpeg executable name (on PATH) or full path to ffmpeg.exe.</summary>
+        public string FfmpegExe { get; set; } = "ffmpeg";
         public List<string> FfmpegCommon { get; set; } = new List<string> { "-hide_banner", "-loglevel", "error", "-y", "-rw_timeout", "15000000" };
 
         // User-editable settings (JSON). Default: PARKING_LOT_IMAGES_DIR env, else OneDrive\ParkingLotImages, else Pictures\ParkingLotImages.
@@ -28,8 +30,8 @@ namespace ParkingLotImagesTray
             new ScheduleEntry { Cron = "0 9-15 * * *", Id = "cap_daytime" },
             new ScheduleEntry { Cron = "0,10,20,30,40,50 16-17 * * *", Id = "cap_evening_rush" }
         };
-        // Single housekeeping cron (local time). Default: 00:10 every day
-        public string HousekeepingCron { get; set; } = "10 0 * * *";
+        // Single housekeeping cron (interpreted in local time via Cronos). Default matches Python script: 03:10 daily
+        public string HousekeepingCron { get; set; } = "10 3 * * *";
 
         public string LogPath => Path.Combine(AppDataDir, "timelapse.log");
         public string StatusPath => Path.Combine(AppDataDir, "status.json");
@@ -88,6 +90,10 @@ namespace ParkingLotImagesTray
                 if (!string.IsNullOrWhiteSpace(streamUrl))
                     cfg.StreamUrl = streamUrl!;
 
+                var ffmpegExe = ConfigurationManager.AppSettings[nameof(FfmpegExe)];
+                if (!string.IsNullOrWhiteSpace(ffmpegExe))
+                    cfg.FfmpegExe = ffmpegExe!.Trim();
+
                 var ffmpegCommonStr = ConfigurationManager.AppSettings[nameof(FfmpegCommon)];
                 if (!string.IsNullOrWhiteSpace(ffmpegCommonStr))
                 {
@@ -119,6 +125,7 @@ namespace ParkingLotImagesTray
                         if (userCfg.RetentionDays.HasValue && userCfg.RetentionDays.Value > 0) cfg.RetentionDays = userCfg.RetentionDays.Value;
                         if (userCfg.ZipYesterday.HasValue) cfg.ZipYesterday = userCfg.ZipYesterday.Value;
                         if (!string.IsNullOrWhiteSpace(userCfg.JpegQuality)) cfg.JpegQuality = userCfg.JpegQuality!;
+                        if (!string.IsNullOrWhiteSpace(userCfg.FfmpegExe)) cfg.FfmpegExe = userCfg.FfmpegExe!.Trim();
                         if (userCfg.FfmpegTimeoutSec.HasValue && userCfg.FfmpegTimeoutSec.Value > 0) cfg.FfmpegTimeoutSec = userCfg.FfmpegTimeoutSec.Value;
                         if (userCfg.Schedules != null && userCfg.Schedules.Count > 0)
                         {
@@ -165,6 +172,7 @@ namespace ParkingLotImagesTray
             public int? RetentionDays { get; set; }
             public bool? ZipYesterday { get; set; }
             public string? JpegQuality { get; set; }
+            public string? FfmpegExe { get; set; }
             public int? FfmpegTimeoutSec { get; set; }
             public List<ScheduleEntry>? Schedules { get; set; }
             public string? HousekeepingCron { get; set; }
