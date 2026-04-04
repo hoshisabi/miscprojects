@@ -2,6 +2,7 @@
 import ctypes
 import json
 import logging
+import os
 import platform
 import shutil
 import subprocess
@@ -19,7 +20,21 @@ from tzlocal import get_localzone
 # --- CONFIG ---
 STREAM_URL = "https://558312d54930d.streamlock.net/live/ccrb2.fois.axis.stream/playlist.m3u8"
 FFMPEG = "ffmpeg"  # or r"C:\ffmpeg\bin\ffmpeg.exe"
-BASE_DIR = Path(r"F:\Users\decha\OneDrive\ParkingLotImages")
+
+
+def _default_base_dir() -> Path:
+    """Prefer PARKING_LOT_IMAGES_DIR, then OneDrive sync roots (set by Windows), else Pictures."""
+    override = (os.environ.get("PARKING_LOT_IMAGES_DIR") or "").strip()
+    if override:
+        return Path(override)
+    for key in ("OneDrive", "OneDriveConsumer", "OneDriveCommercial"):
+        root = (os.environ.get(key) or "").strip()
+        if root:
+            return Path(root) / "ParkingLotImages"
+    return Path.home() / "Pictures" / "ParkingLotImages"
+
+
+BASE_DIR = _default_base_dir()
 USE_DATE_SUBFOLDERS = True
 RETENTION_DAYS = 30
 ZIP_YESTERDAY = False

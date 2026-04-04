@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.IO;
@@ -13,8 +13,8 @@ namespace ParkingLotImagesTray
         public string StreamUrl { get; set; } = "https://558312d54930d.streamlock.net/live/ccrb2.fois.axis.stream/playlist.m3u8";
         public List<string> FfmpegCommon { get; set; } = new List<string> { "-hide_banner", "-loglevel", "error", "-y", "-rw_timeout", "15000000" };
 
-        // User-editable settings (JSON)
-        public string BaseDir { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "ParkingLotImages");
+        // User-editable settings (JSON). Default: PARKING_LOT_IMAGES_DIR env, else OneDrive\ParkingLotImages, else Pictures\ParkingLotImages.
+        public string BaseDir { get; set; } = ResolveDefaultBaseDir();
         public bool UseDateSubfolders { get; set; } = true;
         public int RetentionDays { get; set; } = 30;
         public bool ZipYesterday { get; set; } = false;
@@ -36,6 +36,24 @@ namespace ParkingLotImagesTray
 
         public static string AppDataDir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ParkingLotImagesTray");
         public static string SettingsPath => Path.Combine(AppDataDir, "ParkingLotImagesTray.settings.json");
+
+        private static string ResolveDefaultBaseDir()
+        {
+            var env = Environment.GetEnvironmentVariable("PARKING_LOT_IMAGES_DIR");
+            if (!string.IsNullOrWhiteSpace(env))
+                return Path.GetFullPath(env.Trim());
+
+            foreach (var key in new[] { "OneDrive", "OneDriveConsumer", "OneDriveCommercial" })
+            {
+                var root = Environment.GetEnvironmentVariable(key);
+                if (!string.IsNullOrWhiteSpace(root))
+                    return Path.Combine(root.Trim(), "ParkingLotImages");
+            }
+
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
+                "ParkingLotImages");
+        }
 
         public static AppConfig Load()
         {
@@ -120,6 +138,19 @@ namespace ParkingLotImagesTray
             {
                 // ignore and keep defaults
             }
+
+            // Old machines: settings may reference a drive that no longer exists (e.g. F:).
+            try
+            {
+                var root = Path.GetPathRoot(Path.GetFullPath(cfg.BaseDir));
+                if (!string.IsNullOrWhiteSpace(root) && root.Length >= 2 && root[1] == Path.VolumeSeparatorChar)
+                {
+                    var drive = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    if (!Directory.Exists(drive))
+                        cfg.BaseDir = ResolveDefaultBaseDir();
+                }
+            }
+            catch { /* keep cfg.BaseDir */ }
 
             // Ensure base dir exists
             try { Directory.CreateDirectory(cfg.BaseDir); } catch { }
