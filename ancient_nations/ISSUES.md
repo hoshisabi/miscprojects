@@ -68,13 +68,24 @@ cheap to add and useful for investigating a specific era without re-reading the 
 ## Design / Gameplay
 
 ### 7. Alliance paradox is never resolved
-Multiple times in the seed-42 run, Nation A ended up allied with B and C simultaneously while B
+
+**Partially resolved (2026-04):** Alliance stress is now implemented.
+`ai.py::_resolve_allied_to_both_sides_war` detects when a nation is allied to both sides of a
+war and increments `alliance_contradiction_turns` each tick. Once it exceeds
+`ALLIANCE_STRESS_BREAK_TURNS` (tunable in `data/balance.json5`), the younger alliance is
+severed without betrayal penalty. The forced-choice moment now exists; the nation is logged
+when it happens (`[DIPLO]`).
+
+What's still open: the break always drops the *younger* treaty, which is predictable. A more
+nuanced version might weigh alliance tier or proximity. Left as a future tuning question.
+
+~~Multiple times in the seed-42 run, Nation A ended up allied with B and C simultaneously while B
 and C were at war with each other. The game allows this indefinitely — there's no pressure on A
 to pick a side. It makes diplomatic state feel slightly incoherent and removes an interesting
 forced-choice moment.
 
 Even a soft mechanic (alliance stress, reputational cost, or a timer that breaks the weaker
-alliance) would add tension.
+alliance) would add tension.~~
 
 ### 8. Population numbers become very large and lose meaning
 By turn 1000, Phoenicia had 40 million people on a 100×100 tile map. The numbers are internally

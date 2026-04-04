@@ -34,6 +34,7 @@ class Tile:
         'army',           # Army obj or None  (top army on tile)
         'armies',         # list of Army objs
         'captured_turn',
+        'territory_neglect',  # turns this tile was owned but outside all friendly town radii
     ]
 
     def __init__(self, x, y):
@@ -50,6 +51,7 @@ class Tile:
         self.army     = None
         self.armies   = []
         self.captured_turn = -1
+        self.territory_neglect = 0
 
     def is_land(self):
         return self.terrain != TERRAIN_OCEAN
@@ -111,6 +113,12 @@ class World:
 
     def in_bounds(self, x, y):
         return 0 <= x < MAP_SIZE and 0 <= y < MAP_SIZE
+
+    def set_tile_owner(self, x, y, nation_idx):
+        """Assign tile owner and reset territory-neglect (new administration)."""
+        t = self.t(x, y)
+        t.territory_neglect = 0
+        t.owner = nation_idx
 
     def neighbors4(self, x, y):
         for dx,dy in ((1,0),(-1,0),(0,1),(0,-1)):
