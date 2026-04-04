@@ -1,5 +1,4 @@
-﻿{
-  "BaseDir": "F:/Users/decha/OneDrive/ParkingLotImages",
+{
   "UseDateSubfolders": true,
   "RetentionDays": 30,
   "ZipYesterday": false,
