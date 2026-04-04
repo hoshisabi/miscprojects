@@ -417,6 +417,8 @@ class Game:
         slot = dead_slots[0]
         slot.slot_revivals += 1
         slot.alive         = True
+        slot.death_turn    = None
+        slot.absorbed_by   = None
         slot.tiles         = rebel_tiles
         slot.towns         = rebel_towns
         slot.armies        = rebel_armies

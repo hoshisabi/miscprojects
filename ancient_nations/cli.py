@@ -6,8 +6,8 @@ Designed to be consumed programmatically (e.g. by Claude) via JSON output.
 Usage
 -----
   python cli.py run   --seed 42 --turns 200
-  python cli.py run   --seed 42 --turns 200 --events
   python cli.py run   --seed 42 --turns 200 --no-events
+  python cli.py run   --seed 42 --turns 200 --log-limit 200
   python cli.py query --seed 42 --turns 100 --tile 45,32
   python cli.py query --seed 42 --turns 100 --nation Romanus
   python cli.py query --seed 42 --turns 100 --region 3,4
@@ -116,7 +116,7 @@ def battle_dict(b, nation_names):
     }
 
 
-def game_summary(game):
+def game_summary(game, log_limit=50):
     """Full snapshot of game state at current turn."""
     nation_names = [n.name for n in game.nations]
 
@@ -141,27 +141,36 @@ def game_summary(game):
         'resource_values': {RESOURCE_NAMES[r]: round(game.world.resource_values[r], 2)
                             for r in range(NUM_RESOURCES)},
         'logs':           [{'turn': t, 'msg': m, 'nation': n}
-                           for t, m, n in game.logs[-50:]],
+                           for t, m, n in game.logs[-log_limit:]],
     }
 
 
 def turn_summary(game):
-    """Lightweight per-turn snapshot for NDJSON streaming."""
+    """Lightweight per-turn snapshot for NDJSON streaming.
+
+    Dead nations have territory/armies/gold zeroed out so consumers
+    aren't misled by draining tile counts. death_turn and absorbed_by
+    appear on dead nation rows; use alive=false as the reliable signal.
+    """
+    def _nation_row(n):
+        row = {
+            'name':          n.name,
+            'trait':         n.trait['name'] if n.trait else None,
+            'trait_id':      n.trait['id'] if n.trait else None,
+            'slot_revivals': n.slot_revivals,
+            'territory':     len(n.tiles) if n.alive else 0,
+            'armies':        n.total_armies() if n.alive else 0,
+            'gold':          round(n.res[RES_GOLD], 1) if n.alive else 0,
+            'alive':         n.alive,
+        }
+        if not n.alive:
+            row['death_turn']  = n.death_turn
+            row['absorbed_by'] = n.absorbed_by
+        return row
+
     return {
         'turn': game.turn,
-        'nations': [
-            {
-                'name':          n.name,
-                'trait':         n.trait['name'] if n.trait else None,
-                'trait_id':      n.trait['id'] if n.trait else None,
-                'slot_revivals': n.slot_revivals,
-                'territory':     len(n.tiles),
-                'armies':        n.total_armies(),
-                'gold':          round(n.res[RES_GOLD], 1),
-                'alive':         n.alive,
-            }
-            for n in game.nations
-        ],
+        'nations': [_nation_row(n) for n in game.nations],
         'battles_this_turn': [
             battle_dict(b, [n.name for n in game.nations])
             for b in game.battles if b.turn == game.turn
@@ -186,7 +195,8 @@ def cmd_run(args):
     for _ in range(args.turns):
         g.process_turn()
 
-    out = game_summary(g)
+    log_limit = max(1, min(args.log_limit, min(10_000, LOG_MAX)))
+    out = game_summary(g, log_limit=log_limit)
     out['battles'] = [battle_dict(b, [n.name for n in g.nations]) for b in g.battles]
 
     if getattr(args, 'format', 'json') == 'narrative':
@@ -344,6 +354,62 @@ def cmd_map(args):
     }, args.pretty)
 
 
+def cmd_summary(args):
+    """Run simulation and emit a compact human-readable summary for sharing."""
+    g = Game(seed=args.seed, num_nations=args.nations)
+    if args.no_events:
+        for k in g.events._cooldowns:
+            g.events._cooldowns[k] = 999999
+    for _ in range(args.turns):
+        g.process_turn()
+
+    out   = game_summary(g)
+    out['battles'] = [battle_dict(b, [n.name for n in g.nations]) for b in g.battles]
+
+    nations  = out['nations']
+    battles  = out['battles']
+    events   = out['events']
+    turns    = out['turn']
+    seed     = out['seed']
+
+    alive   = sorted([n for n in nations if n['alive']],     key=lambda n: -n['territory'])
+    dead    = sorted([n for n in nations if not n['alive']], key=lambda n: n.get('death_turn') or 0)
+
+    lines = []
+    lines.append(f"Ancient Nations — seed {seed}, {turns} turns")
+    lines.append("")
+
+    # Standings
+    lines.append("Standings:")
+    for i, n in enumerate(alive, 1):
+        trait = n.get('trait') or '?'
+        lines.append(f"  {i}. {n['name']} ({trait}) — {n['territory']} tiles, "
+                     f"pop {n['population']:,}, {n['battles_won']}W/{n['battles_lost']}L")
+    for n in dead:
+        dt = n.get('death_turn')
+        ab = n.get('absorbed_by')
+        trait = n.get('trait') or '?'
+        fate = f"absorbed by {ab} at t{dt}" if ab and dt else (f"eliminated at t{dt}" if dt else "eliminated")
+        lines.append(f"  ✗ {n['name']} ({trait}) — {fate}")
+
+    # Notable events
+    HIGH_IMPACT = {'civil_war', 'assassination', 'rebellion', 'plague', 'drought', 'earthquake'}
+    notable = [e for e in events if e.get('type') in HIGH_IMPACT]
+    notable.sort(key=lambda e: e['turn'])
+    if notable:
+        lines.append("")
+        lines.append("Notable events:")
+        for e in notable[:8]:
+            lines.append(f"  t{e['turn']:>4}: {e['description']}")
+
+    # Battle totals
+    lines.append("")
+    lines.append(f"Battles: {out['battles_total']} total, {out['events_total']} world events")
+
+    sys.stdout.write('\n'.join(lines) + '\n')
+    sys.stdout.flush()
+
+
 # ── Utilities ─────────────────────────────────────────────────────────────────
 
 def _print(obj, pretty=False):
@@ -375,6 +441,8 @@ def build_parser():
     sp = sub.add_parser('run', parents=[shared], help='Run simulation and print final state')
     sp.add_argument('--format', choices=['json', 'narrative'], default='json',
                     help='Output format (default: json)')
+    sp.add_argument('--log-limit', type=int, default=50, dest='log_limit',
+                    help='Max log entries in output (default 50; sim only retains up to LOG_MAX lines in memory)')
 
     # query
     sq = sub.add_parser('query', parents=[shared], help='Query a specific aspect of state')
@@ -390,6 +458,10 @@ def build_parser():
                         help='Emit one JSON line per turn (NDJSON)')
     st.add_argument('--from', dest='from_turn', type=int, default=None, metavar='T',
                     help='Only emit lines for turns >= T (full sim still runs from start)')
+
+    # summary
+    sub.add_parser('summary', parents=[shared],
+                   help='Compact human-readable summary — standings, deaths, notable events')
 
     # battles
     sub.add_parser('battles', parents=[shared], help='Print full battle log')
@@ -413,6 +485,7 @@ def main():
         'run':     cmd_run,
         'query':   cmd_query,
         'stream':  cmd_stream,
+        'summary': cmd_summary,
         'battles': cmd_battles,
         'map':     cmd_map,
     }
