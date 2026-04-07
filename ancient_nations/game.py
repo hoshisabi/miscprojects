@@ -34,8 +34,6 @@ class CombatManager:
 class Game:
     def __init__(self, seed=None, num_nations=NUM_NATIONS):
         self.turn     = 0
-        self.paused   = True
-        self.speed    = TURN_DELAY
         self.logs     = []          # list of (turn, msg, nation_idx|-1)
         self.battles  = []          # list of Battle objects
 

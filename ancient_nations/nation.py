@@ -9,7 +9,7 @@ from entities import Town, Army
 class DiplomaticStatus:
     PEACE    = 'peace'
     WAR      = 'war'
-    TRADE    = 'trade'      # peace + active trade agreement
+    TRADE    = 'trade'      # reserved for future treaty-style trade; not assigned anywhere today
     ALLIANCE = 'alliance'   # mutual defence + resource sharing
 
 
@@ -42,7 +42,7 @@ class Nation:
         self.diplomacy      = {}
         self.peace_timer    = {}   # {other_idx: turns of enforced peace remaining}
         self.war_cooldown   = {}   # {other_idx: cooldown turns}
-        self.trade_deals    = {}   # {other_idx: {res: amount per turn}}
+        self.trade_deals    = {}   # {other_idx: {res: amount per turn}} — reserved; not read or written today
         self.alliance_cd    = {}   # {other_idx: turns before can re-ally}
         self.alliance_age   = {}   # {other_idx: turns the alliance has been active}
         self.betrayed_turns = 0    # turns remaining of reputation penalty (others wary)

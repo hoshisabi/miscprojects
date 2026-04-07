@@ -65,7 +65,7 @@ else:
 
 # ─────────────────────────────────────────────────────────────────────────────
 from constants import *
-from game import Game
+from engine import GameSession
 from renderer import (Renderer, VIEW_WORLD, VIEW_REGION,
                       VIEW_LOG, VIEW_CHARTS, VIEW_BATTLES)
 
@@ -90,11 +90,11 @@ class App:
         print('\033[0m')
         sys.stdout.flush()
 
-        self.game      = Game(seed=seed)
-        self.renderer  = Renderer(self.game)
+        self.session   = GameSession(seed=seed)
+        self.renderer  = Renderer(self.session)
         self.running   = True
         self.speed_idx = 2   # index into SPEED_STEPS
-        self.game.speed = self.SPEED_STEPS[self.speed_idx]
+        self.session.speed = self.SPEED_STEPS[self.speed_idx]
 
     def run(self):
         sys.stdout.write('\033[?25l')   # hide cursor
@@ -120,8 +120,9 @@ class App:
                     break
 
             # Advance game turn
-            if not self.game.paused and (now - last_turn >= self.game.speed):
-                self.game.process_turn()
+            s = self.session
+            if not s.paused and (now - last_turn >= s.speed):
+                s.step()
                 last_turn = now
 
             # Render frame
@@ -132,7 +133,7 @@ class App:
         if ch is None:
             return
         r       = self.renderer
-        g       = self.game
+        g       = self.session.game
         cx, cy  = r.cursor
 
         if ch in ('q', 'Q', '\x1b'):
@@ -142,15 +143,15 @@ class App:
             r.clear()
 
         elif ch == ' ':
-            g.paused = not g.paused
+            self.session.paused = not self.session.paused
 
         elif ch == '+':
-            self.speed_idx  = max(0, self.speed_idx - 1)
-            g.speed         = self.SPEED_STEPS[self.speed_idx]
+            self.speed_idx        = max(0, self.speed_idx - 1)
+            self.session.speed   = self.SPEED_STEPS[self.speed_idx]
 
         elif ch == '-':
-            self.speed_idx  = min(len(self.SPEED_STEPS) - 1, self.speed_idx + 1)
-            g.speed         = self.SPEED_STEPS[self.speed_idx]
+            self.speed_idx        = min(len(self.SPEED_STEPS) - 1, self.speed_idx + 1)
+            self.session.speed   = self.SPEED_STEPS[self.speed_idx]
 
         elif ch in ('z', 'Z'):
             if r.view == VIEW_WORLD:

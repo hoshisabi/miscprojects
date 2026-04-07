@@ -40,8 +40,13 @@ VIEW_BATTLES = 'battles'
 
 
 class Renderer:
-    def __init__(self, game):
-        self.game      = game
+    def __init__(self, session):
+        """`session` is a GameSession (owns .game and playback flags)."""
+        self.session = session
+
+    @property
+    def game(self):
+        return self.session.game
         self.view      = VIEW_WORLD
         self.cursor    = (5, 5)      # outer-grid cursor (ox, oy)
         self.scroll    = 0           # log scroll offset
@@ -132,7 +137,8 @@ class Renderer:
         g = self.game
         w = self.world = g.world
         turn_str = f'ANCIENT NATIONS  Turn {g.turn:>5d}'
-        pause_str = '  [PAUSED]' if g.paused else f'  speed:{g.speed:.1f}s'
+        s = self.session
+        pause_str = '  [PAUSED]' if s.paused else f'  speed:{s.speed:.1f}s'
         self._emit(self._crt_frame_top(turn_str + pause_str))
 
         MAP_W = OUTER_SIZE * 4   # 4 chars per outer cell (wide display)

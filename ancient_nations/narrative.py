@@ -1,7 +1,7 @@
 """
 narrative.py — Prose renderer for Ancient Nations game state.
 
-Takes the dict produced by game_summary() (i.e. `cli.py run --format json`)
+Takes the dict produced by game_summary() / GameSession.snapshot() (e.g. `cli.py run --format json`)
 and returns a readable text chronicle.  Pure function: no file I/O, no game
 objects, no network.  Call it on any source of game-state JSON.
 
@@ -467,7 +467,7 @@ def render(state: dict) -> str:
     """
     Render a game_summary dict as a prose chronicle.
 
-    state must be the dict produced by cli.py's game_summary() —
+    state must be the dict produced by snapshot.game_summary() / GameSession.snapshot() —
     i.e. the output of `cli.py run` (JSON or parsed).
     """
     battles = state.get('battles', [])

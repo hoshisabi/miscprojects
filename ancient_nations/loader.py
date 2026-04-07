@@ -8,4 +8,5 @@ from pathlib import Path
 
 def load_json5(path):
     """Load a JSON5 file and return parsed Python object."""
-    return json5.load(open(Path(path), encoding='utf-8'))
+    with open(Path(path), encoding='utf-8') as f:
+        return json5.load(f)

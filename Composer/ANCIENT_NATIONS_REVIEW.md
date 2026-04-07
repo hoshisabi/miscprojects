@@ -54,49 +54,69 @@ I claim no final reply; I'm leaving room below for the record.
 
 *2026-04-04 — Vellum. Vesper asked for a snapshot Dan can copy to `moltbook/` for Wren: where war/alliance/trade logic actually lives before anyone edits mechanics.*
 
+*2026-04-06 — Vellum. Refreshed line anchors against current tree; added `allies()` / economy hooks; **noted `TRADE` + `trade_deals` are not on the active trade path** (see caveat below).*
+
 ### Canonical predicates (`allied_with` / `at_war_with`)
 
 | Location | Role |
 |----------|------|
-| **`nation.py`** ~L9–13 | `DiplomaticStatus`: `PEACE`, `WAR`, `TRADE`, `ALLIANCE`. |
-| **`nation.py`** ~L116–123 | `status_with`, **`at_war_with`**, **`allied_with`** — definitions; everything else should agree with these. |
-| **`nation.py`** ~L134–155 | **`declare_war`**, **`make_peace`**, **`can_declare_war`**; war blocks ally without breaking alliance first. |
-| **`nation.py`** ~L152–210 | Alliances: **`can_ally`**, **`alliance_tier`**, **`form_alliance`**, **`break_alliance`**, **`_sever_alliance`**, **`tick_diplomacy`** (cooldowns, `alliance_age`, betrayal rep). |
-| **`nation.py`** ~L45–46 | `trade_deals`, `alliance_cd`, `alliance_age` — persistent diplomatic state. |
+| **`nation.py`** L9–13 | `DiplomaticStatus`: `PEACE`, `WAR`, `TRADE`, `ALLIANCE`. |
+| **`nation.py`** L41–47 | `diplomacy`, `peace_timer`, `war_cooldown`, **`trade_deals`**, `alliance_cd`, `alliance_age` — persistent diplomatic state. |
+| **`nation.py`** L118–126 | **`status_with`**, **`at_war_with`**, **`allied_with`** — definitions; everything else should agree with these. |
+| **`nation.py`** L128–131 | **`allies()`** — list of allied indices (used by `game._apply_alliance_dividends` and movement helpers). |
+| **`nation.py`** L136–153 | **`declare_war`**, **`make_peace`**, **`can_declare_war`**; must break alliance before attacking ally. |
+| **`nation.py`** L155–214 | Alliances: **`can_ally`**, **`alliance_tier`**, **`form_alliance`**, **`break_alliance`**, **`_sever_alliance`**, **`tick_diplomacy`**. |
+| **`nation.py`** L244–260 | **`collect_resources`** — **`allied_with(tile.owner)`** grants partial yield on ally territory (0.6× vs owned 1.0×); enemy tiles blocked. |
+
+### Caveat: `TRADE` status vs instant trades
+
+**`DiplomaticStatus.TRADE`** and **`Nation.trade_deals`** exist on paper but **no runtime code assigns `TRADE` or populates `trade_deals` today.** Bilateral trade is **`ai._trade_decisions`** only: instant swap of surplus↔need while both at **peace** (not at war), with no ongoing deal object. If you add embargo / standing routes / UI “active treaties,” reconcile whether to revive `TRADE` + `trade_deals` or delete/rename dead fields.
 
 ### AI policy (who declares what)
 
 | Location | Role |
 |----------|------|
-| **`ai.py`** ~L31–140 | Diplomacy pass: peace when losing, **`_offer_peace`**, **`_propose_alliance`**, war/alliance guards using **`at_war_with`** / **`allied_with`**. |
-| **`ai.py`** ~L213+, ~L290+, ~L348, ~L405–407, ~L600 | Movement / combat / border logic consulting **`at_war_with`** / **`allied_with`** (e.g. ally join wars, skip friends). |
-| **`ai.py`** ~L592+ | **`_trade_decisions`** — trade offers and `trade_deals` maintenance (entry point for “trade dividers”). |
+| **`ai.py`** L27–33 | Tick order: **`_tick_diplomacy`**, **`_trade_decisions`**. |
+| **`ai.py`** L72–247 | Diplomacy: mutual defence, betrayal, union vote, peace offers — heavy use of **`at_war_with`** / **`allied_with`**. |
+| **`ai.py`** L248–460 | Movement / combat / borders: war checks, Tier-4 ally defence branch (~L441–447). |
+| **`ai.py`** L352+ | Road/radius sets built from **`allies()`**. |
+| **`ai.py`** L630–662 | **`_trade_decisions`** — instant exchange only (see caveat). |
 
 ### Turn / economy hooks
 
 | Location | Role |
 |----------|------|
-| **`game.py`** ~L115–120, ~L171+ | **`_apply_alliance_dividends`** — resource drip for allied nations (`alliance_tier`). |
-| **`game.py`** ~L240–242 | Clean alliance break on peaceful union path. |
-| **`game.py`** ~L374–375 | Rebel spawn: immediate **`declare_war`** both ways. |
+| **`game.py`** L116–117, L178–196 | **`_apply_alliance_dividends`** — per-turn resource bonus for Tier ≥ 1 allies (bilateral, each pair once). |
+| **`game.py`** L312–314 | **`peaceful_annex`**: **`break_alliance`** both ways before eliminating smaller slot. |
+| **`game.py`** L449–450 | **`spawn_rebel_nation`**: rebel and parent **`declare_war`** each other immediately. |
+
+### Tuning (numbers)
+
+| Location | Role |
+|----------|------|
+| **`data/balance.json5`** | `ALLIANCE_*`, `BETRAYAL_*`, **`AI_TRADE_CHANCE`**, **`AI_ALLY_CHANCE`**, `SURRENDER_CHANCE`, etc. |
+| **`constants.py`** | Loads balance into module-level names AI/diplomacy code imports. |
 
 ### Serialization & UI (must match `nation.py` truth)
 
 | Location | Role |
 |----------|------|
-| **`cli.py`** ~L46–47, ~L123–130, ~L223 | `nation_dict` fills **`wars_with`** / **`allied_with`** from **`at_war_with`** / **`allied_with`**. |
-| **`renderer.py`** ~L221–223 | Side panel war/ally lists same predicates. |
-| **`events.py`** ~L365 | Event context: counts **`at_war_with`**. |
+| **`cli.py`** L128–130, L233 | `nation_dict` / summaries: **`wars_with`** / **`allied_with`** from **`at_war_with`** / **`allied_with`**. |
+| **`renderer.py`** L221–223 | Side panel war/ally lists same predicates. |
+| **`events.py`** L365 | Event context: counts wars via **`at_war_with`**. |
 
 ### Combat modifiers (alliance-adjacent)
 
-| **`combat.py`** | `tier4_def`, trait dice — Tier-4 alliance joint defence bonus. |
+| Location | Role |
+|----------|------|
+| **`combat.py`** L17–26, L53–54 | `tier4_def` — Tier-4 alliance joint-command: +1 defence die when flag set. |
 
-### Suggested grep (repo root, `ancient_nations/`)
+### Suggested grep (from `ancient_nations/`)
 
 ```text
-rg -n "allied_with|at_war_with" nation.py ai.py cli.py renderer.py events.py
-rg -n "declare_war|make_peace|form_alliance|break_alliance|trade_deals|_trade_decisions" nation.py ai.py game.py
+rg -n "allied_with|at_war_with|\\ballies\\(" nation.py ai.py cli.py renderer.py events.py game.py
+rg -n "declare_war|make_peace|form_alliance|break_alliance|trade_deals|DiplomaticStatus|_trade_decisions" nation.py ai.py game.py
+rg -n "ALLIANCE_|AI_TRADE|AI_ALLY|BETRAYAL_" constants.py data/balance.json5
 ```
 
-*(End of Vellum’s first installment; code map may grow with follow-up turns.)*
+*(Code map may grow with follow-up turns.)*
