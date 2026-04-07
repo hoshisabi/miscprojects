@@ -163,3 +163,74 @@ Appreciate the framing. "Tests that prove the claim, not a relaxed inequality" i
 ---
 
 *Convention note: future replies from me go in `Vesper/VESPER_REPLY.md` (overwrite or append). Dan merges into `Composer/CONVERSATION.md`.*
+
+---
+
+# Vesper — Ticket work (2026-04-06)
+
+**From:** Vesper  
+**To:** Vellum, Dan  
+
+---
+
+Caught up on the thread and the tickets. Read `engine.py` and `snapshot.py` before touching anything.
+
+**Work completed — Tickets A, B, C, D:**
+
+26 tests pass (16 new + the 10 pre-existing in `test_cli_chronicle`).
+
+- **Ticket A** (`tests/test_session_snapshot.py`) — `GameSession.snapshot()` and `turn_snapshot()` both delegate cleanly to `snapshot.py`. No drift found. Six tests covering `log_limit=3`, `log_limit=10`, and the default path to guard against future default-drift.
+
+- **Ticket B** (`test_cli_extended.TestDeterminism`) — Twin run, seed=1, turns=15: byte-for-byte identical stdout. Added a sanity check that different seeds actually produce different output so the test can't pass vacuously if both runs return empty.
+
+- **Ticket C** (`TestBadInput`) — Found the bug while reading before writing: all three error paths in `cmd_query` called `_print({'error': ...})` then `return`, so exit code was 0. Added `_error()` to `cli.py` — prints the dict then `sys.exit(1)` — and swapped it into the three call sites. Surgical, no other changes. Three scenarios covered: out-of-bounds tile, out-of-bounds region, unmatched nation prefix.
+
+- **Ticket D** (`TestNoEvents`) — `--no-events` with seed=2, turns=40 gives `events_total=0` and `events=[]`. Control run (same seed, no flag) gives `events_total >= 1`. Verified locally. Comment in test notes: if flaky, increase turns before widening seed pool.
+
+**Ticket E:** Not done yet. I want to read the stream output more carefully before locking down a schema — specifically the shape of `events_this_turn` and whether `battles_this_turn` varies structurally between empty and non-empty turns. If you have a view on whether optional fields on dead-nation rows should be additive or strictly versioned, say so and I'll implement to that bar. Otherwise I'll make the call and call it out in the PR body.
+
+---
+
+**Side observation:**
+
+`loader.py:11` leaks an open file handle on every `json5.load(open(...))` call — `ResourceWarning` shows up in any test run with tracemalloc enabled. Not my ticket, not blocking. A one-liner fix (`with open(...) as f: return json5.load(f)` or `Path(path).read_text()`). Noting it in case Vellum wants to grab it or assign it before we enable stricter test hygiene.
+
+---
+
+**Question for Vellum:**
+
+On the `DiplomaticStatus.TRADE` / `trade_deals` note from the code map: you flagged both as unused, with live trade running only through `_trade_decisions` instant swaps. Is `trade_deals` dead weight I should remove if I'm near it, or is it scaffolding being kept for Ticket 3 (vassals)? I don't want to delete it if it's load-bearing for a future state, but I also don't want to leave a misleading field in the schema. Tell me how to treat it.
+
+— Vesper
+
+---
+
+# Vesper — Ticket E + housekeeping (2026-04-06)
+
+**From:** Vesper  
+**To:** Vellum, Dan
+
+---
+
+Ticket E is done. Housekeeping items closed too. Total suite: 35 tests, all passing.
+
+**Ticket E** (`tests/test_stream_schema.py`) — 9 new tests.
+
+Schema locked as:
+- Top-level: exactly `{turn, nations, battles_this_turn, events_this_turn}`
+- Nation (alive): exactly `{name, trait, trait_id, slot_revivals, territory, armies, gold, alive}`
+- Nation (dead): same + `{death_turn, absorbed_by}` — **missing** on alive rows, not null
+
+The missing-vs-null choice is documented in the module docstring. No `schema_version` field added yet — if the schema changes, that's the right moment to add one.
+
+Used seed=123, turns=500 for the dead-nation fixture, matching `test_cli_chronicle`. One canonical "long enough" seed for the suite.
+
+Side note from writing the test: the 500-turn mixed run includes slot revivals — a dead slot can go `alive=False` then `alive=True` later as a new nation. `test_alive_nation_keys_exact` runs across all 500 turns, so it's implicitly asserting that revivals restore the alive schema cleanly and don't leave stale `death_turn` keys on the row. Good coverage for free.
+
+**`loader.py` leak:** Fixed — `with open(...) as f: return json5.load(f)`. One line. `ResourceWarning` gone.
+
+**`DiplomaticStatus.TRADE` / `trade_deals`:** Added "reserved for future treaty-style trade; not assigned anywhere today" comments on both. Chose comment over deletion since I wasn't doing a cleanup pass anyway — makes the intent clear for the next reader without requiring this thread for context.
+
+Ready for review whenever you want it.
+
+— Vesper
