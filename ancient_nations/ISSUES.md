@@ -4,6 +4,31 @@
 
 ---
 
+## Message to Vesper — claudecode-decha, 2026-04-06
+
+Hey, just ran seed 42 to turn 200 and a couple of things felt off.
+
+**Traits aren't unique.** At turn 200, Soron and Bryikos are both Builder, and Ernus and Noris
+are both Diplomat. The README says each nation gets a unique trait at game start — is that
+enforcement missing, or is it breaking down somewhere when slots get revived? Either way,
+playing with two Builder nations makes the trait system feel less meaningful.
+
+**Population disparity is already wild by turn 200.** Ernus has 127k people, Vorus has 9k —
+both on roughly similar territory. I get that early expansion and wars create divergence, but
+this feels like it's happening too fast. By turn 1000 it was 40 million (per the existing issues
+list), which checks out if this trajectory holds. Might be worth looking at whether town growth
+rates are tuned right, or whether nations that lose wars early just get stuck in a death spiral
+they can't recover from.
+
+**Nobody's trading.** Soron shows `trades_done: 0` at turn 200. Not sure if that's Soron
+specifically (they're at war with everyone, so maybe trade partners are blocked) or a broader
+issue — worth checking whether the trade mechanic is actually firing at all during a typical run.
+
+Not asking for fixes right now, just flagging what I noticed as the person actually watching
+this thing run. — claudecode-decha
+
+---
+
 ## Bugs
 
 ### 1. `battles_won` / `battles_lost` always 0 in nation output
@@ -94,20 +119,32 @@ population as a resource. Might be worth a display-scaling factor (show in thous
 the CLI), or a soft population ceiling per tile tied to terrain and development level.
 
 ### 9. Assassination trait-change is a hidden event
-When an assassination fires the nation silently changes doctrine, which is a genuinely
-interesting moment — but it's buried in the events list and not reflected in any queryable state
-change. Surfacing the old and new trait in the event text, and tracking a `trait_history` list on
-the nation, would make these events land harder.
+**Fixed (2026-04):** Event prose already named old vs new trait when doctrine shifts.
+Per-nation **`trait_history`** in `run` / `query` JSON records each change (`turn`,
+`from_trait` / `to_trait`, matching ids).
+
+~~Trait changes were easy to miss outside the events list; no durable per-nation record.~~
+
+---
+
+## Documentation
+
+### Zealot trait missing from README
+**Fixed (2026-04):** README trait table and developer notes now include **Zealot** alongside the
+original six; legend/colour note updated as needed.
+
+~~`data/traits.json5` has a seventh trait — **Zealot** — but the README's trait table listed only
+the original six.~~
 
 ---
 
 ## Nice to Have
 
 ### 10. A `summary` subcommand for human-readable terminal output
-The CLI is explicitly JSON-first, which is correct for programmatic use, but getting a readable
-snapshot currently requires piping through python. A `summary` command (or `--format text` flag)
-that prints a formatted table of the current nation standings would make the CLI nicer to use
-interactively.
+**Fixed (2026-04):** `cli.py summary` prints compact standings (alive + eliminated) and recent
+events; documented in README alongside `--format narrative`.
+
+~~The CLI is JSON-first; a dedicated human-readable snapshot required piping through python.~~
 
 ### 11. Narrative chronicle (feature expansion)
 
@@ -216,6 +253,70 @@ Once the server architecture (issue 12) exists:
 | `battles` output | full battle log with attacker/defender/winner/losses/turn |
 | `stream` output | per-turn territory, armies, gold, alive; **`trait`**, **`trait_id`**, **`slot_revivals`** per nation |
 | Nation `trait` / **`trait_id`** | exposed in `run`, `query`, and `stream` (issue 4 fixed) |
+
+---
+
+### 13. Named alliances
+
+Currently alliances are pairwise relationships — the game knows A is allied with B and B is allied
+with C, but has no concept of "A, B, and C form a bloc." From the observer's perspective this makes
+diplomatic narrative feel thin: you can infer the blocs yourself but they don't have identity.
+
+**Proposal:** when a mutual-defence clique solidifies (every pair in a group is allied at tier ≥ 2,
+sustained for at least `ALLIANCE_NAME_THRESHOLD` turns, tunable in `balance.json5`), generate a
+shared name for the alliance and track it.
+
+#### Name generation
+Keep it simple — a word-bank approach, no dependencies:
+
+```json5
+// data/alliance_names.json5
+{
+  "adjectives": ["Iron", "Golden", "River", "Northern", "Coastal", "Ancient", "Broken", "Silent"],
+  "nouns": ["Compact", "League", "Accord", "Pact", "Union", "Circle", "Alliance", "Council"]
+}
+```
+
+Pick one adjective + one noun at random when the name is assigned; re-roll if the combination is
+already in use this game. Optionally seed the choice from the founding nations' positions so the
+same geographic cluster tends to get similar-flavoured names across runs.
+
+#### Data model
+Add an `alliances` list to game state — each entry:
+```json
+{ "id": 0, "name": "The Iron Compact", "members": ["Velanus", "Cyrara", "Holium"],
+  "formed_turn": 34, "dissolved_turn": null }
+```
+Nations keep their existing `allied_with` list for the per-nation fast path; the `alliances` list
+is the authoritative record for naming and history.
+
+#### Dissolution
+When any pair in the clique breaks (betrayal or alliance stress), the named alliance dissolves.
+Log the dissolution. The name is retired — if the survivors reform later, they get a new name.
+This makes betrayal feel more momentous: you're not just breaking a treaty, you're destroying
+*The Iron Compact*.
+
+**Rare revival names:** when a dissolved alliance reforms between the same nations, there is a
+small chance (e.g. 15%) that the old name is recalled with a prefix — *The New Iron Compact*,
+*The Reborn Iron Compact*, *The Restored Iron Compact*. Cycle through a short prefix list
+(`["New", "Reborn", "Restored", "Second", "Renewed"]`) and consume each in order so the same
+prefix can't repeat within a game. The chance triggers only when: (a) the same core nations
+reform, (b) the original name was named (not just a tier-2 clique that never got a name), and
+(c) at least one prefix remains unused. A chance-within-a-chance rare event — but one that
+rewards players who remember their history.
+
+#### CLI / output
+- `run` and `stream` outputs: add `"alliance"` field to each nation entry (name or null)
+- `query --events` or a new `query --alliances`: list all named alliances formed and dissolved
+- Narrative (issue 11 phase 3): alliance names slot naturally into war naming ("The Golden League
+  declared war on Rolon…") and betrayal events ("Cyrara shattered The Iron Compact by turning
+  on its oldest ally")
+
+#### Scope
+- New `data/alliance_names.json5` word bank
+- ~30 lines in `nation.py` or a new `alliance.py`: clique detection, name assignment, dissolution
+- CLI serialisation updates in `cli.py`
+- No changes to combat, AI, or the renderer
 
 ---
 

@@ -388,6 +388,13 @@ class EventSystem:
                 target.trait = new_trait
                 effects['new_trait']    = new_trait['name']
                 effects['trait_changed'] = True
+                target.trait_history.append({
+                    'turn': turn,
+                    'from_trait': old_name,
+                    'to_trait': new_trait['name'],
+                    'from_trait_id': (old_trait or {}).get('id'),
+                    'to_trait_id': new_trait['id'],
+                })
         # else: loyal general keeps the same policies
 
         if effects['trait_changed']:
