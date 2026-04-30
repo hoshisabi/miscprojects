@@ -432,6 +432,7 @@ class Game:
         slot.name   = self._namegen.generate()
         slot.letter = slot.name[0].upper()
         slot.trait  = random.choice(self.trait_list)
+        slot.trait_history = []
         slot.history = {
             'territory': [], 'population': [], 'gold': [],
             'food': [], 'wood': [], 'metal': [],

@@ -51,6 +51,9 @@ class Nation:
         # Nation trait (dict loaded from traits.json5, assigned by Game)
         self.trait : dict | None = None
 
+        # Doctrine shifts (e.g. assassination). Each entry: turn, from_trait, to_trait, ids.
+        self.trait_history : list[dict] = []
+
         # Turns remaining before this slot is eligible for a rebellion event.
         # Set when the nation is absorbed via surrender; counts down while dead.
         self.rebellion_cooldown = 0

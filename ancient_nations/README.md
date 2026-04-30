@@ -125,6 +125,7 @@ through the game but can change via **Assassination**.
 | Diplomat | Alliances tier up 2× faster, betrayal reputation halved |
 | Fortifier | +1 defence die always, +2 castle defence dice |
 | Expansionist | +2 town gathering radius, 10% cheaper armies |
+| Zealot | +40% food yield, +1 attack die, 0.7× trade volume, 2× betrayal reputation duration, 1.8× rebellion chance |
 
 ### World Events
 
@@ -154,6 +155,30 @@ for a **Rebellion** event after any cooldown expires:
 - The rebel state inherits those tiles, any towns and armies within them, a random trait, and
   immediately goes to war with the parent nation
 
+### Seasons
+
+Every 45 turns the world cycles between a **wet season** (+10% food yield) and a **dry season**
+(−12% food yield). The multiplier applies to all food collection. Tunable in `balance.json5`
+via `SEASON_LENGTH_TURNS`, `SEASON_FOOD_MUL_WET`, and `SEASON_FOOD_MUL_DRY`.
+
+### Famine and Town Downgrade
+
+If a nation's food stockpile falls to or below `FAMINE_FOOD_THRESHOLD` (default 8) after upkeep,
+it enters famine. After `FAMINE_DOWNGRADE_TURNS` (default 5) consecutive famine turns, each
+affected town loses one level (minimum level 1). Recovering food supply stops the clock.
+
+### Territory Neglect
+
+Tiles that fall outside every friendly town's gathering radius accumulate neglect. After
+`TERRITORY_NEGLECT_ABANDON_TURNS` (default 14) turns of neglect a tile reverts to neutral.
+Overextended empires slowly lose their fringe territory without active town coverage.
+
+### Alliance Stress
+
+When a nation is allied to both sides of a war, `alliance_contradiction_turns` increments each
+tick. Once it exceeds `ALLIANCE_STRESS_BREAK_TURNS` (default 16), the younger alliance is
+severed without betrayal penalty. The forced-choice moment is logged under `[DIPLO]`.
+
 ---
 
 ## Data Files — Tweaking the Game
@@ -165,24 +190,31 @@ Edit them freely; no Python knowledge required.
 
 Every numeric game constant: army costs, speeds, alliance tier thresholds, AI aggressiveness,
 surrender thresholds, union vote probabilities, turn delay, window size, and more.
-This is the first place to look when tuning game feel.
+This is the first place to look when tuning game feel. Notable tunables:
+
+- `SEASON_LENGTH_TURNS`, `SEASON_FOOD_MUL_WET`, `SEASON_FOOD_MUL_DRY` — season cycle and food multipliers
+- `FAMINE_FOOD_THRESHOLD`, `FAMINE_DOWNGRADE_TURNS` — when famine triggers and how quickly towns suffer
+- `TERRITORY_NEGLECT_ABANDON_TURNS` — how long before uncovered tiles revert to neutral
+- `ALLIANCE_STRESS_BREAK_TURNS` — turns before a contradictory alliance auto-severs
 
 ### `data/traits.json5`
 
-The six nation trait definitions.  Each trait is a JSON object with any combination of these
+The seven nation trait definitions.  Each trait is a JSON object with any combination of these
 modifier keys (missing keys fall back to neutral defaults):
 
 ```
-army_cost_mul      1.0  — multiplier on army build costs
-atk_dice_bonus     0    — extra attacker dice
-def_dice_bonus     0    — extra defender dice
-castle_def_bonus   0    — extra dice on top of normal castle bonus
-trade_mul          1.0  — multiplier on resources per trade
-gold_income_mul    1.0  — multiplier on gold deposit yields
-dev_cost_mul       1.0  — multiplier on construction wood costs
-alliance_age_mul   1.0  — how fast alliance age increments
-betrayal_rep_mul   1.0  — multiplier on betrayal reputation duration
-town_radius_bonus  0    — flat bonus added to every town's gathering radius
+army_cost_mul         1.0  — multiplier on army build costs
+atk_dice_bonus        0    — extra attacker dice
+def_dice_bonus        0    — extra defender dice
+castle_def_bonus      0    — extra dice on top of normal castle bonus
+trade_mul             1.0  — multiplier on resources per trade
+gold_income_mul       1.0  — multiplier on gold deposit yields
+food_yield_mul        1.0  — multiplier on all food collection (farms, rivers, deposits)
+dev_cost_mul          1.0  — multiplier on construction wood costs
+alliance_age_mul      1.0  — how fast alliance age increments
+betrayal_rep_mul      1.0  — multiplier on betrayal reputation duration
+town_radius_bonus     0    — flat bonus added to every town's gathering radius
+rebellion_prone_mul   1.0  — multiplier on per-turn rebellion chance (>1 = more prone)
 ```
 
 You can add, remove, or modify traits freely — just keep the `id`, `name`, and `description`
@@ -265,19 +297,26 @@ On Windows, if `python` points at the Store stub, prefix every command with `uv 
 
 ```bash
 python cli.py run --turns 200 --seed 42                    # final summary JSON
+python cli.py run --turns 200 --seed 42 --format narrative # prose chronicle on stdout
 python cli.py run --turns 200 --seed 42 --no-events        # deterministic sim (no random events)
 python cli.py run --turns 200 --seed 42 --log-limit 200    # include up to 200 log entries (default 50)
+python cli.py run --turns 200 --seed 42 --pretty           # indented JSON
+python cli.py summary --seed 42 --turns 200                # compact human-readable standings + events
 python cli.py stream --seed 42 --turns 200                 # NDJSON: one object per turn
 python cli.py stream --seed 42 --turns 800 --from 600      # same sim, only emit turns ≥ 600
-python cli.py query --seed 42 --turns 100 --nation Soron  # nation detail (prefix match on name)
+python cli.py query --seed 42 --turns 100 --nation Soron   # nation detail (prefix match on name)
 python cli.py query --seed 42 --turns 100 --tile 50,32     # tile detail (x,y comma-separated)
+python cli.py query --seed 42 --turns 100 --region 3,4     # outer region summary (ox,oy grid coords)
 python cli.py query --seed 42 --turns 800 --events --from 600  # world events with turn ≥ 600
 python cli.py map --seed 42                                # ASCII map; simulates 0 turns by default
 python cli.py map --seed 42 --turns 50                     # map after 50 turns
 python cli.py battles --seed 42 --turns 100                # full battle log
 ```
 
-Summary JSON includes per-nation **`trait`**, **`trait_id`**, **`slot_revivals`** (civil-war slot reuse count), and nation-level **`battles_won`** / **`battles_lost`**. Stream lines include the trait fields and **`slot_revivals`** on each nation row.
+Shared flags available on all subcommands: `--nations N` (number of nations, default 6),
+`--pretty` (indented JSON output), `--no-events` (disable random world events).
+
+Summary JSON includes per-nation **`trait`**, **`trait_id`**, **`trait_history`** (assassination-driven doctrine changes), **`slot_revivals`** (civil-war slot reuse count), and nation-level **`battles_won`** / **`battles_lost`**. Stream lines include the trait fields and **`slot_revivals`** on each nation row.
 
 Stream rows for dead nations zero out `territory`, `armies`, and `gold` so consumers aren't
 misled by draining tile counts. Dead nation rows also include `death_turn` (int) and

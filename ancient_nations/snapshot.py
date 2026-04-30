@@ -30,6 +30,7 @@ def nation_dict(n, turn=0):
         'alliances_formed': n.history.get('alliances_formed', 0),
         'trait':            n.trait['name'] if n.trait else None,
         'trait_id':         n.trait['id'] if n.trait else None,
+        'trait_history':    [dict(h) for h in n.trait_history],
         'slot_revivals':    n.slot_revivals,
         'death_turn':       n.death_turn,
         'absorbed_by':      n.absorbed_by,
