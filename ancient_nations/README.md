@@ -243,10 +243,13 @@ Increase rarity to make an event rarer; decrease it to make it fire more often.
 | `combat.py` | RISK-style dice resolution; accepts trait dice bonuses as parameters |
 | `pathfinding.py` | A* with terrain costs; accepts `road_allied` set for Tier-3 alliance road bonus |
 | `events.py` | `EventSystem`; loads metadata from `data/events.json5`; all event effect logic |
+| `engine.py` | `GameSession` wrapper: owns the run loop, `step()`, `snapshot()`, `turn_snapshot()` |
 | `game.py` | Turn loop; `absorb_nation`, `peaceful_annex`, `spawn_rebel_nation`; combat manager |
+| `snapshot.py` | Pure serialisation helpers (`nation_dict`, `army_dict`, `battle_dict`, `tile_dict`) used by CLI and tests |
+| `narrative.py` | Prose renderer: takes a `game_summary` dict and returns a text chronicle; no game objects |
 | `renderer.py` | Pure ANSI ASCII renderer; no curses (Windows compatible) |
 | `main.py` | Entry point; keyboard input loop |
-| `cli.py` | Headless JSON/NDJSON API for programmatic observation |
+| `cli.py` | Headless JSON/NDJSON/narrative API for programmatic observation |
 
 ### Key Design Decisions
 

@@ -6,6 +6,7 @@ Designed to be consumed programmatically (e.g. by Claude) via JSON output.
 Usage
 -----
   python cli.py run   --seed 42 --turns 200
+  python cli.py run   --seed 42 --turns 200 --format narrative   # prose chronicle on stdout
   python cli.py run   --seed 42 --turns 200 --no-events
   python cli.py run   --seed 42 --turns 200 --log-limit 200
   python cli.py query --seed 42 --turns 100 --tile 45,32
@@ -17,8 +18,9 @@ Usage
   python cli.py battles --seed 42 --turns 200
   python cli.py map    --seed 42              # ASCII map: no turns simulated unless --turns set
 
-All commands write JSON (or NDJSON for stream) to stdout.
-Pass --pretty for human-readable indented JSON.
+`run` defaults to JSON; use `--format narrative` for plain-text chronicle output.
+Other commands write JSON (or NDJSON for `stream`) to stdout unless noted.
+Pass `--pretty` for human-readable indented JSON where JSON applies.
 """
 
 import argparse
