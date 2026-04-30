@@ -140,7 +140,9 @@ def _nations_intro(state: dict, battles: list) -> str:
 
         trait = n.get('trait')
         if trait:
-            character = f"a {trait.lower()} people"
+            tlow = trait.lower()
+            article = 'an' if tlow[:1] in 'aeiou' else 'a'
+            character = f"{article} {tlow} people"
         elif rate >= 0.70:
             character = "a fearsome military power"
         elif rate >= 0.55:
@@ -156,7 +158,7 @@ def _nations_intro(state: dict, battles: list) -> str:
 
     intro = (
         f"Six nations rose from the wilderness: "
-        f"{_list_names(names[:-1])}, and {names[-1]}.  "
+        f"{_list_names(names)}.  "
         f"Each would carve its own path.\n\n"
     )
     intro += '  '.join(lines)
