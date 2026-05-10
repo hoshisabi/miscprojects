@@ -139,6 +139,71 @@ def transcribe_groq(audio_path, api_key, language="en", speed=1.0, preprocess=Tr
                 pass
 
 
+def diarize(audio_path, hf_token, num_speakers=None):
+    """Run pyannote speaker diarization. Returns list of (start, end, speaker) tuples."""
+    from pyannote.audio import Pipeline
+    from pydub import AudioSegment
+    import torch
+
+    logging.debug("Loading pyannote diarization pipeline")
+    pipeline = Pipeline.from_pretrained(
+        "pyannote/speaker-diarization-3.1",
+        token=hf_token,
+    )
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    pipeline = pipeline.to(torch.device(device))
+
+    # torchcodec is broken on Windows, and torchaudio falls back to it too.
+    # Load via pydub and convert raw samples to a torch tensor directly.
+    logging.debug("Extracting audio for diarization")
+    audio = AudioSegment.from_file(str(audio_path))
+    if audio.channels > 1:
+        audio = audio.set_channels(1)
+    audio = audio.set_frame_rate(16000)
+
+    import numpy as np
+    samples = np.array(audio.get_array_of_samples(), dtype=np.float32)
+    samples /= float(2 ** (8 * audio.sample_width - 1))  # normalize to [-1.0, 1.0]
+    waveform = torch.from_numpy(samples).unsqueeze(0)  # (1, num_samples)
+    audio_input = {"waveform": waveform, "sample_rate": audio.frame_rate}
+    logging.debug("Waveform shape=%s sample_rate=%d max=%.4f", waveform.shape, audio.frame_rate, waveform.abs().max().item())
+
+    logging.debug("Running diarization (device=%s)", device)
+    kwargs = {}
+    if num_speakers is not None:
+        kwargs["num_speakers"] = num_speakers
+    diarization = pipeline(audio_input, **kwargs)
+
+    if hasattr(diarization, "speaker_diarization"):
+        sd_turns = list(diarization.speaker_diarization.itertracks(yield_label=True))
+        ex_turns = list(diarization.exclusive_speaker_diarization.itertracks(yield_label=True))
+        logging.debug("speaker_diarization turns=%d exclusive turns=%d", len(sd_turns), len(ex_turns))
+        annotation = diarization.exclusive_speaker_diarization if ex_turns else diarization.speaker_diarization
+    else:
+        annotation = diarization
+    turns = [
+        (turn.start, turn.end, speaker)
+        for turn, _, speaker in annotation.itertracks(yield_label=True)
+    ]
+    logging.debug("Diarization found %d turns", len(turns))
+    return turns
+
+
+def assign_speakers(segments, turns):
+    """Map each (start, end, text) segment to the speaker with the most overlap."""
+    result = []
+    for start, end, text in segments:
+        best_speaker = "UNKNOWN"
+        best_overlap = 0.0
+        for t_start, t_end, speaker in turns:
+            overlap = max(0.0, min(end, t_end) - max(start, t_start))
+            if overlap > best_overlap:
+                best_overlap = overlap
+                best_speaker = speaker
+        result.append((start, end, best_speaker, text))
+    return result
+
+
 def transcribe_local(audio_path, args):
     from faster_whisper import WhisperModel
     device = args.device if args.device and args.device != "auto" else detect_device()
@@ -203,6 +268,24 @@ Note: Groq preprocessing requires ffmpeg to be installed.
         "--groq-key",
         default=os.environ.get("GROQ_API_KEY"),
         help="Groq API key (or set GROQ_API_KEY env var); uses Groq cloud if provided"
+    )
+
+    # Diarization options (local path only)
+    parser.add_argument(
+        "--diarize",
+        action="store_true",
+        help="Run speaker diarization via pyannote (local path only; requires HF token)"
+    )
+    parser.add_argument(
+        "--hf-token",
+        default=os.environ.get("HF_TOKEN"),
+        help="HuggingFace token for pyannote model access (or set HF_TOKEN env var)"
+    )
+    parser.add_argument(
+        "--num-speakers",
+        type=int,
+        default=None,
+        help="Expected number of speakers (optional hint for diarization)"
     )
 
     # Groq options
@@ -318,13 +401,27 @@ Note: Groq preprocessing requires ffmpeg to be installed.
                 print(line, file=out_file)
                 logging.debug("Segment: %.2f -> %.2f: %s", start, end, text)
         else:
+            if args.diarize and not args.hf_token:
+                logging.error("--diarize requires an HF token (--hf-token or HF_TOKEN env var)")
+                sys.exit(1)
+
             logging.debug("Using local model '%s'", args.model)
-            segments, info = transcribe_local(audio_path, args)
+            segments_gen, info = transcribe_local(audio_path, args)
             print("Detected language '%s' with probability %.2f" % (info.language, info.language_probability), file=out_file)
-            for segment in segments:
-                line = "[%.2fs -> %.2fs] %s" % (segment.start, segment.end, segment.text)
-                print(line, file=out_file)
-                logging.debug("Segment: %.2f -> %.2f: %s", segment.start, segment.end, segment.text)
+
+            if args.diarize:
+                turns = diarize(audio_path, args.hf_token, num_speakers=args.num_speakers)
+                raw_segments = [(s.start, s.end, s.text) for s in segments_gen]
+                labeled = assign_speakers(raw_segments, turns)
+                for start, end, speaker, text in labeled:
+                    line = "[%s] [%.2fs -> %.2fs] %s" % (speaker, start, end, text)
+                    print(line, file=out_file)
+                    logging.debug("Segment: %s %.2f -> %.2f: %s", speaker, start, end, text)
+            else:
+                for segment in segments_gen:
+                    line = "[%.2fs -> %.2fs] %s" % (segment.start, segment.end, segment.text)
+                    print(line, file=out_file)
+                    logging.debug("Segment: %.2f -> %.2f: %s", segment.start, segment.end, segment.text)
     finally:
         if out_file:
             out_file.close()
