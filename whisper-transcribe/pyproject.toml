@@ -3,14 +3,24 @@ name = "whisper-transcribe"
 version = "0.1.0"
 description = "CLI tool to transcribe audio files using OpenAI's Whisper model"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
-    "audioop-lts>=0.2.2",
+    "audioop-lts>=0.2.2; python_version >= '3.13'",
     "faster-whisper>=1.2.1",
     "groq>=1.1.1",
+    "pyannote.audio>=3.3",
     "pydub>=0.25.1",
     "python-dotenv>=1.2.2",
+    "torch==2.11.0+cu128",
 ]
 
 [project.scripts]
 whisper-transcribe = "main:main"
+
+[tool.uv.sources]
+torch = { index = "pytorch-cuda" }
+
+[[tool.uv.index]]
+name = "pytorch-cuda"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
