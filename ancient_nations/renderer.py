@@ -42,11 +42,7 @@ VIEW_BATTLES = 'battles'
 class Renderer:
     def __init__(self, session):
         """`session` is a GameSession (owns .game and playback flags)."""
-        self.session = session
-
-    @property
-    def game(self):
-        return self.session.game
+        self.session   = session
         self.view      = VIEW_WORLD
         self.cursor    = (5, 5)      # outer-grid cursor (ox, oy)
         self.scroll    = 0           # log scroll offset
@@ -58,6 +54,10 @@ class Renderer:
         self._buf         = []
         self._frame       = 0
         self._force_clear = True   # full clear on first frame and after view changes
+
+    @property
+    def game(self):
+        return self.session.game
 
     # -- public entry ------------------------------------------------------
     def render(self):

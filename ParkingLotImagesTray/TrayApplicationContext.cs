@@ -1,44 +1,39 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.Drawing;
-using System.IO;
 using System.IO.Compression;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Windows.Forms;
 using Cronos;
+using Timer = System.Threading.Timer;
 
 namespace ParkingLotImagesTray
 {
     public class TrayApplicationContext : ApplicationContext
     {
         private readonly NotifyIcon _notifyIcon;
-        private readonly System.Threading.Timer _schedulerTimer;
+        private readonly Timer _schedulerTimer;
         private FileSystemWatcher? _settingsWatcher;
-        
+
         // Config
         private const string LATEST_JPG = "latest.jpg";
+
         /// <summary>Cron fields (minute hour …) are evaluated in this zone to match the Python scheduler.</summary>
         private static readonly TimeZoneInfo ScheduleTimeZone = TimeZoneInfo.Local;
+
         private AppConfig _config = AppConfig.Load();
         private string LOG_PATH => _config.LogPath;
         private string STATUS_PATH => _config.StatusPath;
 
         private List<(CronExpression Cron, string Id)> _jobs = new();
         private CronExpression? _housekeepingCron;
-        
+
         private readonly object _scheduleLock = new();
         private CancellationTokenSource _reloadDebounceCts = new();
 
         public TrayApplicationContext()
         {
             Directory.CreateDirectory(_config.BaseDir);
-            
+
             _notifyIcon = new NotifyIcon()
             {
                 Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application,
@@ -46,7 +41,8 @@ namespace ParkingLotImagesTray
                 Visible = true,
                 Text = "Parking Lot Image Capture"
             };
-            _notifyIcon.MouseClick += (s, e) => {
+            _notifyIcon.MouseClick += (s, e) =>
+            {
                 if (e.Button == MouseButtons.Left)
                 {
                     ShowInfoDialog();
@@ -56,17 +52,18 @@ namespace ParkingLotImagesTray
             _notifyIcon.ContextMenuStrip.Items.Add("View Log", null, (s, e) => ShowLogs());
             _notifyIcon.ContextMenuStrip.Items.Add("Capture Current Image", null, (s, e) => Task.Run(CaptureOne));
             _notifyIcon.ContextMenuStrip.Items.Add("Load Latest Image", null, (s, e) => OpenLatestImage());
-            _notifyIcon.ContextMenuStrip.Items.Add("Open Images Folder", null, (s, e) => Process.Start("explorer.exe", Path.GetFullPath(_config.BaseDir)));
+            _notifyIcon.ContextMenuStrip.Items.Add("Open Images Folder", null,
+                (s, e) => Process.Start("explorer.exe", Path.GetFullPath(_config.BaseDir)));
             _notifyIcon.ContextMenuStrip.Items.Add("Edit Config", null, (s, e) => OpenConfigFile());
             _notifyIcon.ContextMenuStrip.Items.Add("Reload Config", null, (s, e) => Task.Run(ReloadConfig));
             _notifyIcon.ContextMenuStrip.Items.Add("-");
             _notifyIcon.ContextMenuStrip.Items.Add("Exit", null, (s, e) => Exit());
 
             // Initialize and start the precise scheduler
-            _schedulerTimer = new System.Threading.Timer(SchedulerTick, null, Timeout.Infinite, Timeout.Infinite);
+            _schedulerTimer = new Timer(SchedulerTick, null, Timeout.Infinite, Timeout.Infinite);
             LoadJobsFromConfig();
             ScheduleNext();
-            
+
             // Set up automatic config reloading
             SetupSettingsWatcher();
 
@@ -74,7 +71,7 @@ namespace ParkingLotImagesTray
             PreventSleep();
             Task.Run(CaptureOne); // Initial capture
         }
-        
+
         private void SetupSettingsWatcher()
         {
             try
@@ -103,11 +100,11 @@ namespace ParkingLotImagesTray
                 _reloadDebounceCts.Cancel();
                 _reloadDebounceCts = new CancellationTokenSource();
             }
-            
+
             Task.Delay(500, _reloadDebounceCts.Token).ContinueWith(t =>
             {
                 if (t.IsCanceled) return;
-                
+
                 // Must invoke on the main thread if we want to show balloons
                 if (Application.OpenForms.Count > 0)
                 {
@@ -118,8 +115,8 @@ namespace ParkingLotImagesTray
                         return;
                     }
                 }
-                ReloadConfig();
 
+                ReloadConfig();
             }, TaskScheduler.Default);
         }
 
@@ -186,7 +183,7 @@ namespace ParkingLotImagesTray
         {
             var nowUtc = DateTime.UtcNow;
             var utcNowMinusGrace = nowUtc.AddSeconds(-5); // 5-second grace period
-            
+
             lock (_scheduleLock)
             {
                 // Capture jobs
@@ -209,11 +206,11 @@ namespace ParkingLotImagesTray
                         Task.Run(Housekeeping);
                     }
                 }
-                
+
                 // Anti-sleep call
                 PreventSleep();
             }
-            
+
             // Reschedule for the next run
             ScheduleNext();
         }
@@ -282,7 +279,8 @@ namespace ParkingLotImagesTray
                 else
                 {
                     _notifyIcon.BalloonTipTitle = "Parking Lot Image Capture";
-                    _notifyIcon.BalloonTipText = $"No {LATEST_JPG} found yet. Capture one now via 'Capture Current Image'.";
+                    _notifyIcon.BalloonTipText =
+                        $"No {LATEST_JPG} found yet. Capture one now via 'Capture Current Image'.";
                     _notifyIcon.BalloonTipIcon = ToolTipIcon.Info;
                     _notifyIcon.ShowBalloonTip(3000);
                 }
@@ -317,6 +315,7 @@ namespace ParkingLotImagesTray
                         Log($"Invalid schedule '{s.Id}': {ex.Message}");
                     }
                 }
+
                 _housekeepingCron = null;
                 try
                 {
@@ -330,7 +329,8 @@ namespace ParkingLotImagesTray
                     Log($"Invalid housekeeping cron: {_config.HousekeepingCron} → {ex.Message}");
                 }
 
-                Log($"Loaded {_jobs.Count} schedules from config{(_housekeepingCron != null ? ", housekeeping cron active" : ", housekeeping disabled")}");
+                Log(
+                    $"Loaded {_jobs.Count} schedules from config{(_housekeepingCron != null ? ", housekeeping cron active" : ", housekeeping disabled")}");
             }
             catch (Exception ex)
             {
@@ -377,19 +377,26 @@ namespace ParkingLotImagesTray
                             process.Start();
 
                             // Correctly handle timeout with CancellationToken
-                            using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_config.FfmpegTimeoutSec)))
+                            using (var cts = new CancellationTokenSource(
+                                       TimeSpan.FromSeconds(_config.FfmpegTimeoutSec)))
                             {
                                 try
                                 {
                                     await process.WaitForExitAsync(cts.Token);
-                                    
+
                                     // Process exited without timeout
                                     if (process.ExitCode == 0)
                                     {
                                         if (File.Exists(finalPath)) File.Delete(finalPath);
                                         File.Move(tmpPath, finalPath);
-                                        
-                                        try { File.Copy(finalPath, Path.Combine(_config.BaseDir, LATEST_JPG), true); } catch { }
+
+                                        try
+                                        {
+                                            File.Copy(finalPath, Path.Combine(_config.BaseDir, LATEST_JPG), true);
+                                        }
+                                        catch
+                                        {
+                                        }
 
                                         string? root = Path.GetPathRoot(_config.BaseDir);
                                         var drive = new DriveInfo(root ?? "C:");
@@ -410,6 +417,7 @@ namespace ParkingLotImagesTray
                                     {
                                         process.Kill();
                                     }
+
                                     Log($"ffmpeg timeout (attempt {attempt}/3)");
                                     TryDeletePartFile(tmpPath);
                                 }
@@ -421,8 +429,10 @@ namespace ParkingLotImagesTray
                         Log($"Capture error (attempt {attempt}/3): {ex.Message}");
                         TryDeletePartFile(tmpPath);
                     }
+
                     await Task.Delay(3000); // Wait before next retry
                 }
+
                 TryDeletePartFile(tmpPath);
                 WriteStatus(false, null, DateTime.Now, 0, "ffmpeg failed after retries");
             }
@@ -438,6 +448,7 @@ namespace ParkingLotImagesTray
             {
                 return Path.Combine(_config.BaseDir, dt.ToString("yyyy-MM-dd"));
             }
+
             return _config.BaseDir;
         }
 
@@ -456,24 +467,24 @@ namespace ParkingLotImagesTray
         private void ZipYesterday()
         {
             if (!_config.ZipYesterday || !_config.UseDateSubfolders) return;
-            
+
             var y = DateTime.Now.AddDays(-1);
             var folder = GetOutDir(y);
             var zipPath = Path.Combine(_config.BaseDir, Path.GetFileName(folder) + ".zip");
 
             if (!Directory.Exists(folder) || File.Exists(zipPath)) return;
-            
+
             try
             {
                 long beforeSize = 0;
-                
+
                 using (var archive = ZipFile.Open(zipPath, ZipArchiveMode.Create))
                 {
                     foreach (var file in Directory.GetFiles(folder, "*", SearchOption.AllDirectories))
                     {
                         var fileInfo = new FileInfo(file);
                         beforeSize += fileInfo.Length;
-                        
+
                         var entryName = Path.GetRelativePath(folder, file);
                         var entry = archive.CreateEntry(entryName, CompressionLevel.Optimal);
                         using var fileStream = fileInfo.OpenRead();
@@ -493,9 +504,10 @@ namespace ParkingLotImagesTray
                 double ratio = (afterSize / (double)beforeSize) * 100;
                 string beforeMB = (beforeSize / (1024.0 * 1024.0)).ToString("F2");
                 string afterMB = (afterSize / (1024.0 * 1024.0)).ToString("F2");
-                
+
                 Directory.Delete(folder, true);
-                Log($"Zipped {Path.GetFileName(folder)} | Before: {beforeMB}MB | After: {afterMB}MB | Ratio: {ratio:F1}%");
+                Log(
+                    $"Zipped {Path.GetFileName(folder)} | Before: {beforeMB}MB | After: {afterMB}MB | Ratio: {ratio:F1}%");
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -591,7 +603,9 @@ namespace ParkingLotImagesTray
             {
                 File.AppendAllText(LOG_PATH, line);
             }
-            catch { }
+            catch
+            {
+            }
         }
 
         private void WriteStatus(bool ok, string? lastCapture, DateTime lastTime, double freeGb, string? error = null)
@@ -607,13 +621,17 @@ namespace ParkingLotImagesTray
             };
             try
             {
-                File.WriteAllText(STATUS_PATH, JsonSerializer.Serialize(status, new JsonSerializerOptions { WriteIndented = true }));
+                File.WriteAllText(STATUS_PATH,
+                    JsonSerializer.Serialize(status, new JsonSerializerOptions { WriteIndented = true }));
             }
-            catch { }
+            catch
+            {
+            }
         }
 
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         static extern uint SetThreadExecutionState(uint esFlags);
+
         private const uint ES_CONTINUOUS = 0x80000000;
         private const uint ES_SYSTEM_REQUIRED = 0x00000001;
         private const uint ES_AWAYMODE_REQUIRED = 0x00000040;
@@ -622,7 +640,8 @@ namespace ParkingLotImagesTray
         {
             var prev = SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_AWAYMODE_REQUIRED);
             if (prev == 0)
-                Log("SetThreadExecutionState failed — system may still sleep during capture (privileges / power policy)");
+                Log(
+                    "SetThreadExecutionState failed — system may still sleep during capture (privileges / power policy)");
         }
 
         private static void TryDeletePartFile(string path)
@@ -644,13 +663,15 @@ namespace ParkingLotImagesTray
             {
                 var exePath = Application.ExecutablePath;
                 var compiledTime = File.GetLastWriteTime(exePath).ToString("yyyy-MM-dd HH:mm:ss");
-                var logModifiedTime = File.Exists(LOG_PATH) ? File.GetLastWriteTime(LOG_PATH).ToString("yyyy-MM-dd HH:mm:ss") : "No log file yet";
+                var logModifiedTime = File.Exists(LOG_PATH)
+                    ? File.GetLastWriteTime(LOG_PATH).ToString("yyyy-MM-dd HH:mm:ss")
+                    : "No log file yet";
                 var destDir = Path.GetFullPath(_config.BaseDir);
 
                 var infoText = $"Parking Lot Image Capture\n\n" +
-                    $"Compiled: {compiledTime}\n" +
-                    $"Log File: {logModifiedTime}\n" +
-                    $"Destination: {destDir}";
+                               $"Compiled: {compiledTime}\n" +
+                               $"Log File: {logModifiedTime}\n" +
+                               $"Destination: {destDir}";
 
                 using var form = new Form
                 {
@@ -670,7 +691,7 @@ namespace ParkingLotImagesTray
                     Multiline = true,
                     Dock = DockStyle.Top,
                     Height = 100,
-                    Font = new System.Drawing.Font("Segoe UI", 10)
+                    Font = new Font("Segoe UI", 10)
                 };
 
                 var panel = new Panel
@@ -720,7 +741,8 @@ namespace ParkingLotImagesTray
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error showing info dialog: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error showing info dialog: {ex.Message}", "Error", MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
         }
 
