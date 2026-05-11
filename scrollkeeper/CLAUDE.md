@@ -22,3 +22,4 @@ Personal TTRPG session chronicle tool. Turns session recordings into a living ca
 - Errors get caught at the source, not baked in silently
 - Audio stays local; only text/images go to GitHub Pages
 - No third-party hosting dependency
+- `dm/` vs `public/` is the hard privacy boundary — DM notes, full NPC details, raw transcripts, and the DM assistant reports all live under `dm/`; only the player-facing recap and selectively published characters/NPCs/locations go under `public/`

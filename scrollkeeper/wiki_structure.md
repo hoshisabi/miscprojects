@@ -7,29 +7,62 @@ Stored in the campaign's git repo alongside session logs.
 
 ```
 campaign/
-  wiki/
+  dm/                                       # DM-only; never published
+    character-sheets/
+      [name].pdf                            # PC character sheets
     characters/
       pcs/
-        oskar.md        # one file per PC
+        images/
+        oskar.md                            # one file per PC
         kaelisa.md
         cinder.md
         araken.md
       npcs/
-        [name].md       # one file per notable NPC
-    locations/
-      [name].md         # one file per location visited or known
+        images/
+        [name].md                           # one file per notable NPC
     factions/
-      [name].md         # organizations, cults, tribes, etc.
-    threads.md          # active plot hooks; mark resolved with date
-    timeline.md         # session-by-session event log, one line per beat
-  sessions/
-    YYYY-MM-DD.md       # DM assistant report per session (not public)
-    YYYY-MM-DD.txt      # raw corrected transcript (not public)
-  public/
-    sessions/           # player-facing recaps
-    characters/         # player-facing character pages
+      [name].md                             # organizations, cults, tribes, etc.
+    locations/
+      [name].md                             # full location details (DM view)
+    sessions/
+      YYYY-MM-DD-dm-assistant.md            # DM assistant report per session
+      session_transcript_MMDDYY.txt         # raw corrected transcript
+    threads.md                              # active plot hooks; mark resolved with date
+    timeline.md                             # session-by-session event log, one line per beat
+  public/                                   # published to GitHub Pages
     index.md
+    characters/                             # PCs only
+      images/
+      [name].md
+    npcs/                                   # notable NPCs (selectively published)
+      images/
+      [name].md
+    locations/
+      images/
+      [name].md
+    sessions/
+      YYYY-MM-DD.md                         # player-facing recap
 ```
+
+## Session log front matter
+
+Public session recaps (`public/sessions/YYYY-MM-DD.md`) use this front matter:
+
+```yaml
+---
+layout: default
+title: "Session N (Month D, YYYY)"
+session_title: "Evocative Chapter Name"
+description: "One or two sentences of narrative prose — written like a hook, not a bullet list."
+---
+
+# Session N (Month D, YYYY)
+```
+
+- `title`: `Session N (Month D, YYYY)` — parentheses, not em dash
+- `session_title`: short evocative name (think chapter title); required — the index renders it as `title — session_title`
+- `description`: narrative prose, present or past tense, written for a reader who wasn't there
+- H1 heading must match `title` exactly
 
 ## Document conventions
 
