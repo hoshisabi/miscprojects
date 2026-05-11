@@ -12,7 +12,7 @@ from google.genai import types
 
 client = genai.Client(api_key=os.environ["GOOGLE_KEY"])
 
-CAMPAIGN_DIR = pathlib.Path(__file__).parent.parent.parent / "hoshisabi.github.io" / "rpg" / "icewind-dale"
+CAMPAIGN_DIR = (pathlib.Path(__file__).parent / os.environ["CAMPAIGN_DIR"]).resolve()
 
 npcs = [
     (

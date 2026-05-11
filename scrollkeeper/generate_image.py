@@ -18,13 +18,13 @@ STYLE_PREFIX = (
     "absolutely no text, no letters, no words, no labels anywhere in the image — "
 )
 
-CAMPAIGN_DIR = pathlib.Path(__file__).parent.parent.parent / "hoshisabi.github.io" / "rpg" / "icewind-dale"
+CAMPAIGN_DIR = (pathlib.Path(__file__).parent / os.environ["CAMPAIGN_DIR"]).resolve()
 
 TYPE_DIRS = {
-    "pc":       CAMPAIGN_DIR / "wiki" / "characters" / "pcs" / "images",
-    "npc":      CAMPAIGN_DIR / "wiki" / "characters" / "npcs" / "images",
-    "location": CAMPAIGN_DIR / "wiki" / "locations" / "images",
-    "other":    CAMPAIGN_DIR / "wiki" / "images",
+    "pc":       CAMPAIGN_DIR / "public" / "characters" / "pcs" / "images",
+    "npc":      CAMPAIGN_DIR / "public" / "npcs" / "images",
+    "location": CAMPAIGN_DIR / "public" / "locations" / "images",
+    "other":    CAMPAIGN_DIR / "public" / "images",
 }
 
 
