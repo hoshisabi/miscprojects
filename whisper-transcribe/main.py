@@ -386,6 +386,10 @@ Note: Groq preprocessing requires ffmpeg to be installed.
             sys.exit(1)
 
     try:
+        if args.groq_key and args.diarize:
+            logging.error("--diarize is only supported with local transcription; cannot be used with Groq API")
+            sys.exit(1)
+
         if args.groq_key:
             logging.debug("Using Groq API (key: %s...%s)", args.groq_key[:6], args.groq_key[-4:])
             language, prob, segments = transcribe_groq(
