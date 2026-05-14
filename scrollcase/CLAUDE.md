@@ -1,4 +1,4 @@
-# scrollkeeper
+# scrollcase
 
 Personal TTRPG session chronicle tool. Turns session recordings into a living campaign record.
 
