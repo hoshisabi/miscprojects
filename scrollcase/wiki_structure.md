@@ -64,6 +64,40 @@ description: "One or two sentences of narrative prose — written like a hook, n
 - `description`: narrative prose, present or past tense, written for a reader who wasn't there
 - H1 heading must match `title` exactly
 
+## Session page body structure
+
+After the H1, the session page body follows this order:
+
+1. Narrative recap (the main content — story prose and player highlights)
+2. Achievements section (if any)
+3. Rewards section (always present)
+
+### Rewards section format
+
+```markdown
+## Rewards
+
+| | |
+|---|---|
+| Adventure | PS-DC-PUB-08 Unremembered Things |
+| Downtime | 10 days |
+| Gold | 350 gp |
+| Level | Optional |
+
+### Magic Items
+- **Ioun Stone of Awareness** *(rare, requires attunement)* — Dark-blue rhomboid. Grants Advantage on Initiative rolls and Wisdom (Perception) checks while orbiting.
+- **Potion of Greater Healing**
+
+### Story Items
+- **Cursed Crystal** — Contains a terrible secret that could not be destroyed; only trapped. Inert until an unknown condition is met.
+```
+
+Notes:
+- Adventure row matches the AL scenario code + title
+- Level row: use "Optional" if the player can choose, omit if not awarded
+- Magic Items: include rarity, attunement requirement, and the mechanical effect in brief
+- Story Items: items with narrative weight but no standard stat block entry — describe the hook
+
 ## Document conventions
 
 ### Character files (PCs and NPCs)

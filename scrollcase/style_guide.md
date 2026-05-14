@@ -1,4 +1,4 @@
-# Scrollkeeper Campaign Style Guide — Icewind Dale
+# Scrollcase Campaign Style Guide — Icewind Dale
 
 ## Visual Style
 
@@ -47,6 +47,23 @@ Note: suppress all text in generated images. Title banners and labels will be ad
 ```
 [PREFIX] small circular badge icon, [achievement description], bold simple shapes
 ```
+
+## Embedding Achievements in Session Pages
+
+Each achievement block follows this pattern:
+
+```html
+<!-- image_prompt: [full image generation prompt] -->
+<img class="achievement-badge" src="images/YYYY-MM-DD-achievement-N.png" alt="[achievement title]">
+
+**[Achievement Title]** — [1-2 sentence description of the moment]
+```
+
+Rules:
+- The `<!-- image_prompt: ... -->` comment is parsed by `process_session.py --generate-images` — keep it on its own line, one per achievement, in order.
+- Use `class="achievement-badge"` (defined in `assets/css/style.css`) — floats the badge left at 72px with the description wrapping right.
+- Use the achievement title as `alt` text, not the full prompt.
+- After the last achievement block, add `<div style="clear:both"></div>` to prevent float bleed.
 
 ## Faction Notes
 
