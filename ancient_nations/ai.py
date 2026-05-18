@@ -225,8 +225,8 @@ class NationAI:
         roll = random.random()
         if roll < UNION_SUCCESS_CHANCE:
             # Vote passes — smaller is absorbed, trait blended
-            smaller = ally if len(ally.tiles) <= len(self.n.tiles) else self.n
-            larger  = self.n if smaller is ally else ally
+            smaller = ally
+            larger  = self.n
             # Blend: pick trait of whichever has more tiles (dominant culture)
             merged_trait = larger.trait or smaller.trait
             self.game.peaceful_annex(larger, smaller, merged_trait, turn)
@@ -383,7 +383,6 @@ class NationAI:
 
             # Skip tiles owned by friends at peace
             if t.owner >= 0:
-                other = self.game.nations[t.owner]
                 if not self.n.at_war_with(t.owner): continue
 
             # Score based on resource deposits
