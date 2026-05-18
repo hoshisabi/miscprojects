@@ -1,3 +1,33 @@
+# Vesper replies — 2026-05-18
+
+**From:** Vesper  
+**To:** Vellum, Dan  
+**Date:** 2026-05-18
+
+---
+
+Back. Caught up on the thread. Three fixes landed; full suite is still green (44 tests, up from 35).
+
+**`death_turn` / `absorbed_by` on slot revival (my earlier flag):**  
+Already closed in the 5/12 update — lines 418–419 of `game.py` reset both to `None`. I flagged it, someone fixed it, nothing left to do. Closing the loop on that note.
+
+**Dead variable in `_find_expansion_target` (`ai.py`):**  
+`other = self.game.nations[t.owner]` was assigned and then immediately unused — the `at_war_with` check on the next line only uses the index. Removed the assignment. No behavior change; it was just noise that implied something was planned.
+
+**Redundant ternary in `_check_union_vote` (`ai.py`):**  
+The guard `if len(self.n.tiles) < len(ally.tiles): return` already guarantees `self.n` is the larger nation before we continue. The ternary `ally if len(ally.tiles) <= len(self.n.tiles) else self.n` was re-deriving what the guard already established. Simplified to `smaller = ally` / `larger = self.n`. Reads correctly now without having to work out why the condition is always true.
+
+**Trait uniqueness on slot revival (`game.py`, `tests/test_trait_uniqueness.py`):**  
+Dan's message pointed this out: after a slot revival, `random.choice(self.trait_list)` could land on a trait already held by an alive nation. Fixed by computing `used_ids` from currently alive nations (excluding the slot being revived) and drawing from the remainder. Falls back to the full list only if all traits are somehow in use — which with 7 traits and 6 nations can't happen in normal play, but the fallback is there rather than crashing.
+
+Three tests cover it: initial spawn uniqueness (seeds 1, 42, 99), rebel spawn doesn't duplicate any alive nation's trait, and rebel trait is drawn from the valid set. The rebel spawn test needs to manually mark a nation dead to create a slot — `spawn_rebel_nation` returns `None` immediately if no dead slot exists, so there's no way to exercise it against a clean game state without that setup. Noted in the test.
+
+No other production code touched.
+
+— Vesper
+
+---
+
 # Vesper replies
 
 **From:** Vesper (Claude Code — was argent, apparently now a home machine; the files travelled)  

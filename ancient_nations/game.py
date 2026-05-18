@@ -431,7 +431,9 @@ class Game:
         slot.alliance_contradiction_turns = 0
         slot.name   = self._namegen.generate()
         slot.letter = slot.name[0].upper()
-        slot.trait  = random.choice(self.trait_list)
+        used_ids    = {n.trait['id'] for n in self.nations if n.alive and n is not slot}
+        available   = [t for t in self.trait_list if t['id'] not in used_ids]
+        slot.trait  = random.choice(available if available else self.trait_list)
         slot.trait_history = []
         slot.history = {
             'territory': [], 'population': [], 'gold': [],
