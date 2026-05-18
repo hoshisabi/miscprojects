@@ -61,7 +61,15 @@ image_prompt:
 ---
 ```
 
-The generator (`generate_artwork.py`) names images `YYYY-MM-DD-1.png`, `YYYY-MM-DD-2.png`, etc., matching the list order.
+The generator (`generate_artwork.py`, or `process_session.py --generate-images DATE`) names images `YYYY-MM-DD-1.png`, `YYYY-MM-DD-2.png`, etc., matching the list order (single prompt ⇒ `YYYY-MM-DD.png`). Both scripts share the same pipeline.
+
+Optional shield crop for achievement PNGs matches the flex layout icons:
+
+```
+uv run python generate_artwork.py public/sessions/YYYY-MM-DD.md --badge
+```
+
+Use `--badge-only` on markdown that already has images to reshape existing files without regenerating via Imagen. Tunables: `--badge-size`, `--badge-width`, `--badge-color`.
 
 If this session needs style details beyond the campaign default, add `image_prompt_prefix` to the frontmatter:
 
@@ -89,6 +97,44 @@ To regenerate only one image (e.g. image 3):
 ```
 uv run python generate_artwork.py public/sessions/YYYY-MM-DD.md --image 3 --force
 ```
+
+**Legacy prompts:** Older pages may omit frontmatter prompts and instead use HTML comments embedded in the body (`<!-- image_prompt: … -->`). The tooling still discovers those comments **only under** `public/sessions/`; new pages should prefer YAML `image_prompt`.
+
+## Player Highlights (portraits)
+
+Wrap each highlight like achievements: **flex row** (portrait left, text right), **no** shield mask — rectangular portrait with the same border radius as achievement icons.
+
+```html
+<div class="highlight">
+<img class="highlight-portrait" src="/rpg/your-campaign/public/characters/images/berg.png" alt="Berg portrait">
+<p><strong>Berg</strong> — [2–4 sentences of recap].</p>
+</div>
+```
+
+**`src`**: copy the URL from that character’s **`image`** field in `public/characters/<slug>.md` (or `public/npcs/...` if the highlight is about an NPC). Paths are usually site-root absolute (`/rpg/...`) or a full **D&D Beyond** avatar URL for drop-in campaigns.
+
+**Markup rules** (same spirit as achievements):
+
+- One `<div class="highlight">` per bullet; portrait + single `<p>...</p>`.
+- Put the whole highlight in `<p><strong>Name</strong> — …</p>` — raw markdown bold won’t parse inside the surrounding HTML block the same way once you mix tags; using `<strong>` keeps it reliable.
+- Use a short `alt` (e.g. `Sparrow portrait`).
+
+## Wiki links (optional)
+
+Tooling: **`scrollcase/link_session_entities.py`** adds **first occurrence only** (per wiki slug) links to PCs, NPCs, and locations. It scans `public/characters/`, `public/npcs/`, and `public/locations/` markdown for **`title`** and optional **`also_known_as`** (use this when recap copy uses shorthand: e.g. *River*, *Dr. Medicine*, *Standing Stones*).
+
+- **Linked region**: body from the end of frontmatter through the line before `\n## Achievements` (includes Player Highlights). If `\n## Rewards` appears earlier in that region, only the slice before Rewards is touched (Rewards stay plain). Achievements onward is never modified.
+- **Styles**: Narrative prose becomes `[**Name**](../category/slug)`; highlight lines use `<strong><a href="...">…</a></strong>` on the opening name.
+- Safe skips: fenced \`\`\` blocks, bracket-balanced Markdown links (including awkward nested brackets), existing `<a>…</a>`, and full `<img …>` tags (so `alt` text is untouched).
+
+Example (from repo root):
+
+```text
+uv run python scrollcase/link_session_entities.py PUBLIC/sessions/
+uv run python scrollcase/link_session_entities.py PUBLIC/sessions/YYYY-MM-DD.md --write
+```
+
+The path passed in must live under **`…/public/sessions/`**.
 
 ## Faction Notes
 
