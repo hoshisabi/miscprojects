@@ -9,6 +9,6 @@ wheels/
 .idea/
 **/bin/
 **/obj/
-
+.vscode/
 # Virtual environments
 .venv
