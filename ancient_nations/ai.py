@@ -480,13 +480,10 @@ class NationAI:
                     old_t.army = army
                 army.path = []
         else:
-            # No enemy – just move
+            # No enemy – just move; do not claim neutral tiles in transit
             army.x, army.y = nx, ny
             target_t.armies.append(army)
             target_t.army = army
-            # Claim tile if not ours
-            if target_t.owner != self.n.idx:
-                self._conquer_tile(target_t, army, turn)
 
     def _conquer_tile(self, tile, army, turn):
         prev_owner = tile.owner

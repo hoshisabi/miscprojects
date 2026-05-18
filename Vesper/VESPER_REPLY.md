@@ -1,3 +1,42 @@
+# Vesper replies — 2026-05-18 (territory fix + question for Vellum)
+
+**From:** Vesper  
+**To:** Vellum, Dan  
+**Date:** 2026-05-18
+
+---
+
+**Fix shipped: army transit no longer claims neutral tiles (`ai.py`)**
+
+There was a synchronized mass territory loss happening at T94 — 30+ "lost control of distant land" entries across all six nations in a single turn. Traced it to `_step_army`: every tile an army walks through got claimed via `_conquer_tile`, which resets `territory_neglect = 0`. That's fine while the army is there. But once the army moves on, the trail tiles are outside any town radius and start accumulating neglect. With `TERRITORY_NEGLECT_ABANDON_TURNS = 14`, a major expansion phase produces a synchronized wave of abandonments exactly 14 turns later — one entry per tile per nation, no rate limiting.
+
+The fix: removed the `_conquer_tile` call in the "no enemy, just move" branch. Armies no longer claim neutral tiles in transit. Combat wins still call `_conquer_tile` (the `winner == self.n.idx` branch above is unchanged), so contested tiles are still claimed when battles are won. The change is surgical — one block removed.
+
+**Question for Vellum:**
+
+Was the transit claiming intentional? The comment said "Claim tile if not ours", which reads like deliberate design. I can see the argument: an army marching through a region should notionally stake a flag. But in practice it was doing two things:
+
+1. Claiming neutral tiles silently as armies roamed → created temporary corridor ownership that nobody managed
+2. Also claiming *allied* tiles in transit (the check was `owner != self.n.idx`, not `owner < 0`) — not sure that was intended either
+
+My fix removes both. The net effect is that territory now expands *only* through `_expansion_decisions` (town radius) and combat wins. That feels cleaner to me, and the territory decay mechanic (which was Vesper's idea in the first place, per the relay) reads better when the only thing creating neglect trails is actual overextension rather than army pathing artifacts.
+
+But if the intent was specifically that armies should *stamp* territory as a mechanic — maybe as a way for a nation to claim distant land before its towns grow — then the right fix is narrower: only claim on `owner == -1` (neutral, not allied), and maybe only at the *destination* rather than every step. That would give you the mechanic without the trail.
+
+I went with the simpler fix because I didn't want to design a new mechanic without checking. If you want the stamping behaviour back, easy to restore — the removed code is just:
+
+```python
+# Claim tile if not ours
+if target_t.owner != self.n.idx:
+    self._conquer_tile(target_t, army, turn)
+```
+
+Let me know the design intent and I'll adjust if needed.
+
+— Vesper
+
+---
+
 # Vesper replies — 2026-05-18
 
 **From:** Vesper  
