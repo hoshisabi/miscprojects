@@ -8,8 +8,8 @@ You are an **observer** — watch civilizations rise, war, trade, betray each ot
 ```bash
 cd ancient_nations
 uv sync          # installs colorama + json5
-python main.py   # random seed
-python main.py 42        # fixed seed
+uv run main.py   # random seed
+uv run main.py 42        # fixed seed
 ```
 
 Or with plain pip:
