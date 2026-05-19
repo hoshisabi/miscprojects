@@ -16,7 +16,7 @@ _NEIGHBOURS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 # Extra tiles in each direction beyond the start-to-end bounding box.
 # Allows A* to route around moderate obstacles without searching the whole map.
-_BOX_MARGIN = 15
+_BOX_MARGIN = 25
 
 
 def find_path(world, sx, sy, tx, ty, nation_idx=None, allow_ocean=True,
