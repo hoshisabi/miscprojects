@@ -22,6 +22,7 @@ class NationAI:
     # ── main entry ────────────────────────────────────────────────────────
     def tick(self, turn):
         if not self.n.alive: return
+        self._tick_leader(turn)
         self._check_surrender(turn)
         if not self.n.alive: return   # may have just surrendered
         self._tick_diplomacy(turn)
@@ -29,6 +30,40 @@ class NationAI:
         self._expansion_decisions(turn)
         self._development_decisions(turn)
         self._trade_decisions(turn)
+
+    # ── leader lifecycle ──────────────────────────────────────────────────
+    def _tick_leader(self, turn):
+        self.n.leader_age += 1
+
+        # Natural death — probability climbs from 0 after 60 turns in power
+        if self.n.leader_age > 60:
+            death_chance = (self.n.leader_age - 60) * 0.003   # ~12 % at turn 100
+            if random.random() < death_chance:
+                old_ep = self.n.leader_epithet()
+                self.n.new_leader()
+                self.game.log(turn,
+                    f"  {self.n.name}'s ruler {old_ep} dies of old age. "
+                    f"Successor rules as {self.n.leader_epithet()}.",
+                    self.n.idx)
+                return
+
+        # Overthrow: famine or rapid territorial loss while at war
+        overthrow = 0.0
+        if self.n.res[RES_FOOD] <= FAMINE_FOOD_THRESHOLD:
+            overthrow += 0.015
+        at_war = any(self.n.at_war_with(o.idx)
+                     for o in self.game.nations if o.alive)
+        if at_war:
+            hist = self.n.history['territory']
+            if len(hist) >= 5 and hist[-1] < hist[-5] * 0.85:
+                overthrow += 0.05
+        if overthrow > 0 and random.random() < overthrow:
+            old_ep = self.n.leader_epithet()
+            self.n.new_leader(crisis=True)
+            self.game.log(turn,
+                f"  {self.n.name}: {old_ep} OVERTHROWN! "
+                f"New ruler {self.n.leader_epithet()} seizes power.",
+                self.n.idx)
 
     # ── diplomacy ─────────────────────────────────────────────────────────
     def _resolve_allied_to_both_sides_war(self, turn):
@@ -88,7 +123,9 @@ class NationAI:
                     len(self.n.tiles) < SURRENDER_TILE_THRESHOLD
                     or (not self.n.armies and len(self.n.tiles) < 20)
                 )
-                if not surrender_desperate and ratio < 0.5 and random.random() < 0.15:
+                # Hawks hold on longer before offering peace
+                peace_threshold = 0.5 - self.n.leader_aggression * 0.2
+                if not surrender_desperate and ratio < peace_threshold and random.random() < 0.15:
                     self._offer_peace(other, turn)
 
             # --- ALLIANCE: mutual-defence + break check + union vote ---
@@ -104,8 +141,11 @@ class NationAI:
                 their_str = other.army_strength() or 1
                 ratio = my_str / (their_str or 1)
                 adjacent = self._is_adjacent_to(other)
-                if adjacent and ratio >= AI_AGGRO_RATIO:
-                    if random.random() < 0.12:
+                # Hawks need less of an advantage and strike more often
+                aggro_threshold = 1.5 - self.n.leader_aggression * 0.4
+                war_chance      = 0.08 + self.n.leader_aggression * 0.22
+                if adjacent and ratio >= aggro_threshold:
+                    if random.random() < war_chance:
                         self._declare_war(other, turn)
 
             # --- PEACE: consider forming alliance ---
@@ -114,7 +154,9 @@ class NationAI:
                     and self.n.can_ally(oi)
                     and other.can_ally(self.n.idx)):
                 if self._should_ally(other, my_str):
-                    if random.random() < AI_ALLY_CHANCE:
+                    # Hawks are less interested in pacts
+                    ally_chance = AI_ALLY_CHANCE * (1.0 - self.n.leader_aggression * 0.5)
+                    if random.random() < ally_chance:
                         self._propose_alliance(other, turn)
 
     def _declare_war(self, other, turn):
@@ -130,13 +172,27 @@ class NationAI:
             self.n.idx)
 
     def _offer_peace(self, other, turn):
-        their_str = other.army_strength() or 1
-        my_str    = self.n.army_strength() or 1
-        if their_str / (my_str or 1) > 0.8 or random.random() < 0.4:
+        """self.n is the losing side asking for peace; other is the winning side.
+
+        The winner decides whether to accept — hawks hold out for more gains,
+        doves are willing to settle.  If the winner is completely dominant they
+        expect surrender, not a negotiated peace.
+        """
+        winner_str = other.army_strength() or 1
+        loser_str  = self.n.army_strength() or 1
+        ratio      = winner_str / (loser_str or 1)   # how dominant the winner is
+
+        # Flat acceptance: doves settle quickly, hawks demand total victory
+        base_accept = 0.5 - other.leader_aggression * 0.4   # 0.10 – 0.50
+        # A crushingly dominant winner expects surrender, not treaty
+        if ratio > 3.0:
+            base_accept *= 0.4
+        if random.random() < base_accept:
             self.n.make_peace(other.idx, turn)
             other.make_peace(self.n.idx, turn)
             self.game.log(turn,
-                f"[peace]  {self.n.name} and {other.name} sign PEACE.",
+                f"[peace]  {self.n.name} sues for peace; {other.name} "
+                f"{other.leader_epithet()} accepts.",
                 self.n.idx)
 
     # ── alliance helpers ──────────────────────────────────────────────────
@@ -155,14 +211,22 @@ class NationAI:
 
     def _propose_alliance(self, other, turn):
         """Both sides mutually agree to an alliance."""
-        # Other AI accepts if it also finds the alliance strategically sound
-        other_ai  = self.game.ai[other.idx]
-        their_str = other.army_strength() or 1
-        if other_ai._should_ally(self.n, their_str) or random.random() < 0.3:
+        # Other AI accepts based on strategic logic; hawks are less receptive
+        other_ai     = self.game.ai[other.idx]
+        their_str    = other.army_strength() or 1
+        accept_bonus = 0.3 - other.leader_aggression * 0.2   # 0.1 – 0.3
+        if other_ai._should_ally(self.n, their_str) or random.random() < accept_bonus:
+            # Both sides must be able to pay the formation cost (diplomatic gifts)
+            cost = {RES_GOLD: ALLIANCE_FORM_GOLD, RES_FOOD: ALLIANCE_FORM_FOOD}
+            if not (self.n.can_afford(cost) and other.can_afford(cost)):
+                return   # can't afford the diplomatic outlay right now
+            self.n.spend(cost)
+            other.spend(cost)
             self.n.form_alliance(other.idx)
             other.form_alliance(self.n.idx)
             self.game.log(turn,
-                f"[ALLY] {self.n.name} and {other.name} form an ALLIANCE!",
+                f"[ALLY] {self.n.name} and {other.name} form an ALLIANCE! "
+                f"(cost: {int(ALLIANCE_FORM_GOLD)}g {int(ALLIANCE_FORM_FOOD)}f each)",
                 self.n.idx)
 
     def _check_mutual_defence(self, ally, turn, my_str):
@@ -269,8 +333,18 @@ class NationAI:
             self.game.absorb_nation(strongest, self.n, turn)
 
     def _is_adjacent_to(self, other):
-        """Check if this nation's territory borders another's."""
-        other_tiles = other.tiles   # set of (x,y) — O(1) lookup
+        """True if territories touch OR capitals are within striking distance.
+
+        Direct tile adjacency is the normal case once borders mature.
+        The capital-distance fallback lets nations declare war before their
+        territories fully meet — otherwise distant starts never make contact.
+        """
+        cap       = self.n.capital
+        other_cap = other.capital
+        if cap and other_cap:
+            if math.dist((cap.x, cap.y), (other_cap.x, other_cap.y)) <= 45:
+                return True
+        other_tiles = other.tiles
         for (x, y) in self.n.tiles:
             if ((x+1, y) in other_tiles or (x-1, y) in other_tiles or
                     (x, y+1) in other_tiles or (x, y-1) in other_tiles):
@@ -329,7 +403,10 @@ class NationAI:
         at_war = any(self.n.at_war_with(o.idx)
                      for o in self.game.nations if o.idx!=self.n.idx and o.alive)
         if at_war: return 'attack'
-        return random.choice(['expand','expand','attack','defend'])
+        # Hawks lean toward attack even in peacetime
+        if self.n.leader_aggression >= 0.65:
+            return random.choice(['expand', 'attack', 'attack', 'defend'])
+        return random.choice(['expand', 'expand', 'attack', 'defend'])
 
     def _move_army(self, army, turn):
         if army.path:
@@ -342,7 +419,12 @@ class NationAI:
             self._assign_destination(army, turn)
 
     def _assign_destination(self, army, turn):
-        if army.order == 'attack' or army.order == 'expand':
+        if army.order == 'attack':
+            # Strictly target enemy tiles; fall back to marching on enemy capital
+            dest = self._find_attack_target(army)
+            if dest is None:
+                dest = self._find_enemy_capital_target(army)
+        elif army.order == 'expand':
             dest = self._find_expansion_target(army)
         elif army.order == 'defend':
             dest = self._find_defense_target(army)
@@ -368,6 +450,49 @@ class NationAI:
                 d = random.choice(candidates)
                 army.path = find_path(self.world, army.x, army.y, d[0], d[1],
                                        self.n.idx, road_allied=road_allied)
+
+    def _find_attack_target(self, army):
+        """Find the best enemy-owned tile within search radius to conquer."""
+        needed = self._most_needed_resource()
+        best_score = -1
+        best_tile  = None
+        cx, cy = army.x, army.y
+
+        for t in self.world.tiles_in_radius(cx, cy, 18):
+            if not t.is_land(): continue
+            if t.owner < 0: continue                         # skip neutral
+            if t.owner == self.n.idx: continue               # skip own tiles
+            if not self.n.at_war_with(t.owner): continue    # skip non-enemies
+
+            score = 0
+            d = t.deposits
+            score += d[needed] * 3
+            for r in range(NUM_RESOURCES):
+                score += d[r]
+            dist = abs(t.x - cx) + abs(t.y - cy)
+            score /= (dist + 1)
+
+            if score > best_score:
+                best_score = score
+                best_tile  = (t.x, t.y)
+
+        return best_tile
+
+    def _find_enemy_capital_target(self, army):
+        """When at war but no enemy tiles are within local search radius,
+        march toward the closest enemy capital as a long-range target."""
+        cx, cy = army.x, army.y
+        best_dist = float('inf')
+        best_dest = None
+        for other in self.game.nations:
+            if not other.alive or not self.n.at_war_with(other.idx): continue
+            cap = other.capital
+            if cap:
+                d = abs(cap.x - cx) + abs(cap.y - cy)
+                if d < best_dist:
+                    best_dist = d
+                    best_dest = (cap.x, cap.y)
+        return best_dest
 
     def _find_expansion_target(self, army):
         """Find the best tile to conquer: prioritise needed resources."""

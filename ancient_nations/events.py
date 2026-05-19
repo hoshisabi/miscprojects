@@ -376,11 +376,16 @@ class EventSystem:
 
         old_trait  = target.trait
         old_name   = old_trait['name'] if old_trait else 'Unknown'
+        old_ep     = target.leader_epithet()
         effects    = {'nation': target.name, 'old_trait': old_name, 'new_trait': old_name,
                       'trait_changed': False}
 
+        # Always install a new (crisis) leader on assassination
+        target.new_leader(crisis=True)
+        new_ep = target.leader_epithet()
+
         if random.random() < ASSN_CHANGE_CHANCE:
-            # New leader, different vision — pick a random different trait
+            # New leader may also shift national doctrine
             all_traits = self.game.trait_list
             others = [t for t in all_traits if t['id'] != (old_trait or {}).get('id')]
             if others:
@@ -395,15 +400,14 @@ class EventSystem:
                     'from_trait_id': (old_trait or {}).get('id'),
                     'to_trait_id': new_trait['id'],
                 })
-        # else: loyal general keeps the same policies
 
         if effects['trait_changed']:
-            desc = (f"ASSASSINATION! {target.name}'s leader is dead! "
-                    f"New ruler brings {effects['new_trait']} vision "
+            desc = (f"ASSASSINATION! {target.name}'s leader {old_ep} is dead! "
+                    f"New ruler {new_ep} brings {effects['new_trait']} vision "
                     f"(was {old_name}).")
         else:
-            desc = (f"ASSASSINATION! {target.name}'s leader is dead! "
-                    f"The new ruler upholds {old_name} tradition.")
+            desc = (f"ASSASSINATION! {target.name}'s leader {old_ep} is dead! "
+                    f"New ruler {new_ep} upholds {old_name} tradition.")
 
         evt = WorldEvent(EVT_ASSASSINATION, turn, cx, cy, 0, mag, desc, effects)
         self.history.append(evt)

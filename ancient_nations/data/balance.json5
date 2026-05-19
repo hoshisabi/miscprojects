@@ -54,10 +54,15 @@
 
   // ── Diplomacy ────────────────────────────────────────────────────────────────
   "PEACE_MIN_TURNS":      8,
-  "WAR_COOLDOWN":         15,
-  "ALLIANCE_MAX":         2,   // max simultaneous alliances per nation
-  "ALLIANCE_COOLDOWN":    25,  // turns before re-allying after mutual break
+  "WAR_COOLDOWN":         8,
+  "ALLIANCE_MAX":         1,   // max simultaneous alliances per nation
+  "ALLIANCE_COOLDOWN":    20,  // turns before re-allying after mutual break
   "ALLIANCE_BETRAYAL_CD": 40,  // longer cooldown after betrayal
+
+  // Forming an alliance costs both sides this many resources up-front.
+  // Short-term cost; the dividend (ALLIANCE_DIVIDEND) is the long-term payoff.
+  "ALLIANCE_FORM_GOLD":   40,
+  "ALLIANCE_FORM_FOOD":   20,
 
   // Alliance tiers: turns of continuous alliance required to reach each tier
   "ALLIANCE_TIER_AGES":  [0, 15, 30, 50, 75],
@@ -79,7 +84,7 @@
   "AI_LOW_RESOURCE": 40,    // expand toward resources below this
   "AI_HIGH_RESOURCE": 200,
   "AI_TRADE_CHANCE": 0.25,
-  "AI_ALLY_CHANCE":  0.07,  // base chance per turn to propose alliance
+  "AI_ALLY_CHANCE":  0.03,  // base chance per turn to propose alliance (hawks reduce further)
 
   // ── Peaceful Union / Annexation ──────────────────────────────────────────────
   // Two very long-allied nations may vote to merge.  The larger absorbs the smaller.

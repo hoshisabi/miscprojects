@@ -23,7 +23,8 @@ class TestTraitHistory(unittest.TestCase):
             # Deterministic: first alternative trait in list order
             return seq[0]
 
-        with patch('events.random.random', side_effect=[0.0, 0.0]), patch(
+        # Call order: (1) target selection, (2) new_leader crisis branch, (3) ASSN_CHANGE_CHANCE
+        with patch('events.random.random', side_effect=[0.0, 0.0, 0.0]), patch(
                 'events.random.choice', fake_choice):
             es._assassination(turn=99, cx=1, cy=1, mag=1)
 
@@ -44,7 +45,8 @@ class TestTraitHistory(unittest.TestCase):
         es = g.events
         target = g.nations[0]
 
-        with patch('events.random.random', side_effect=[0.0, 0.99]):
+        # Call order: (1) target selection, (2) new_leader crisis branch, (3) ASSN_CHANGE_CHANCE
+        with patch('events.random.random', side_effect=[0.0, 0.99, 0.99]):
             es._assassination(turn=3, cx=0, cy=0, mag=1)
 
         self.assertEqual(target.trait_history, [])

@@ -429,8 +429,10 @@ class Game:
         slot.betrayed_turns     = 0
         slot.army_surge_turns   = 0
         slot.alliance_contradiction_turns = 0
-        slot.name   = self._namegen.generate()
-        slot.letter = slot.name[0].upper()
+        slot.name              = self._namegen.generate()
+        slot.letter            = slot.name[0].upper()
+        slot.leader_aggression = random.uniform(0.55, 1.0)  # rebels lean hawk
+        slot.leader_age        = 0
         used_ids    = {n.trait['id'] for n in self.nations if n.alive and n is not slot}
         available   = [t for t in self.trait_list if t['id'] not in used_ids]
         slot.trait  = random.choice(available if available else self.trait_list)

@@ -6,6 +6,16 @@ from constants import *
 from entities import Town, Army
 
 
+_LEADER_EPITHETS = [
+    (0.90, 'the Warmonger'),
+    (0.75, 'the Aggressive'),
+    (0.60, 'the Ambitious'),
+    (0.40, 'the Pragmatic'),
+    (0.20, 'the Cautious'),
+    (0.00, 'the Pacifist'),
+]
+
+
 class DiplomaticStatus:
     PEACE    = 'peace'
     WAR      = 'war'
@@ -58,6 +68,10 @@ class Nation:
         # Set when the nation is absorbed via surrender; counts down while dead.
         self.rebellion_cooldown = 0
 
+        # Leader personality: 0 = dove, 1 = hawk.  Affects war/peace thresholds.
+        self.leader_aggression = random.uniform(0.2, 0.8)
+        self.leader_age        = 0   # turns the current ruler has been in power
+
         # Allied to two nations who are at war with each other — builds until break.
         self.alliance_contradiction_turns = 0
 
@@ -101,6 +115,25 @@ class Nation:
         if self.trait:
             return self.trait.get(key, default)
         return default
+
+    # ── leader personality ────────────────────────────────────────────────
+    def leader_epithet(self):
+        for threshold, epithet in _LEADER_EPITHETS:
+            if self.leader_aggression >= threshold:
+                return epithet
+        return 'the Pragmatic'
+
+    def new_leader(self, crisis=False):
+        """Install a new ruler.  Crisis successions skew toward extremes."""
+        if crisis:
+            # Overthrow / assassination: 60 % chance of a hawk, else a dove
+            if random.random() < 0.60:
+                self.leader_aggression = random.uniform(0.65, 1.0)
+            else:
+                self.leader_aggression = random.uniform(0.0, 0.35)
+        else:
+            self.leader_aggression = random.uniform(0.1, 0.9)
+        self.leader_age = 0
 
     # ── capitals / cities ──────────────────────────────────────────────────
     @property
