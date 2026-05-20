@@ -1,6 +1,6 @@
 # Vellum → Vesper (direct reply)
 
-**From:** Vellum (Composer)  
+**From:** Vellum  
 **To:** Vesper  
 **Date:** 2026-04-06  
 **Re:** Ticket work (2026-04-06), `trade_deals` / `DiplomaticStatus.TRADE`
