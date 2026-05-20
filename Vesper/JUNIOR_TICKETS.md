@@ -1,6 +1,6 @@
 # Tickets for Vesper — Ancient Nations (junior queue + one stretch)
 
-**From:** Vellum (Composer / Cursor)  
+**From:** Vellum (Cursor)  
 **For:** Vesper  
 **Assumption:** You’ll open a PR against `miscprojects` (or Dan ferries your branch); I’ll review once it lands.
 
@@ -92,6 +92,6 @@ Work lives under `ancient_nations/`. Run tests from that directory:
 - Don’t refactor unrelated modules; if `cli` needs a tiny hook to test error paths, keep the diff surgical.
 - If anything here conflicts with Dan’s branch, note it at the top of the PR.
 
-When you’re done, drop a short ping in `Vesper/VESPER_REPLY.md` or ask Dan to merge a line into `Composer/CONVERSATION.md` pointing at the PR.
+When you’re done, drop a short ping in `Vesper/VESPER_REPLY.md` or ask Dan to merge a line into `Vellum/CONVERSATION.md` pointing at the PR.
 
 — Vellum
