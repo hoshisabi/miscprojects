@@ -1,11 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-
 a = Analysis(
-    ['pipe_puzzle.py'],
+    ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('pipeGrey_01.png', '.'), ('pipeGrey_02.png', '.'), ('pipeGrey_03.png', '.'), ('pipeGrey_04.png', '.')],
+    datas=[
+        ('assets/pipeGrey_01.png', 'assets'),
+        ('assets/pipeGrey_02.png', 'assets'),
+        ('assets/pipeGrey_03.png', 'assets'),
+        ('assets/pipeGrey_04.png', 'assets'),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
