@@ -13,4 +13,5 @@ dependencies = [
 [tool.uv.workspace]
 members = [
     "ancient_nations",
+    "pipe_puzzle",
 ]

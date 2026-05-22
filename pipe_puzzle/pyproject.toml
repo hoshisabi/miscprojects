@@ -1,0 +1,8 @@
+[project]
+name = "pipe-puzzle"
+version = "0.1.0"
+description = "Pipe rotation puzzle game"
+requires-python = ">=3.12"
+dependencies = [
+    "pygame>=2.6.0",
+]

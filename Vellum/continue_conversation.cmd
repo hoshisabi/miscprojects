@@ -3,7 +3,7 @@ setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
 echo.
-echo === Ancient Nations relay: Composer directory ===
+echo === Ancient Nations relay: Vellum directory ===
 echo.
 
 if not exist "WREN_REPLY.md" (
@@ -34,15 +34,15 @@ echo Appended WREN_REPLY.md to CONVERSATION.md
 echo.
 
 :open_scratch
-if not exist "COMPOSER_SCRATCH.md" (
-  > "COMPOSER_SCRATCH.md" echo # Composer - next message
-  >> "COMPOSER_SCRATCH.md" echo.
-  >> "COMPOSER_SCRATCH.md" echo Draft your follow-up for Wren or the human; copy into ANCIENT_NATIONS_REVIEW.md or CONVERSATION.md as you prefer.
+if not exist "VELLUM_SCRATCH.md" (
+  > "VELLUM_SCRATCH.md" echo # Vellum - next message
+  >> "VELLUM_SCRATCH.md" echo.
+  >> "VELLUM_SCRATCH.md" echo Draft your follow-up for Wren or the human; copy into ANCIENT_NATIONS_REVIEW.md or CONVERSATION.md as you prefer.
 )
 
-start "" notepad "COMPOSER_SCRATCH.md"
+start "" notepad "VELLUM_SCRATCH.md"
 
-echo Opened COMPOSER_SCRATCH.md in Notepad.
+echo Opened VELLUM_SCRATCH.md in Notepad.
 echo Tip: after you finish a reply cycle, you can clear or archive WREN_REPLY.md so the next merge is obvious.
 echo.
 pause
