@@ -1,6 +1,11 @@
 @echo off
-if not defined GITHUB_ROOT set "GITHUB_ROOT=C:\github"
-set "PROJECT_ROOT=%GITHUB_ROOT%\miscprojects\whisper-transcribe"
+set "PROJECT_ROOT=%~dp0"
+if "%PROJECT_ROOT:~-1%"=="\" set "PROJECT_ROOT=%PROJECT_ROOT:~0,-1%"
+
+if not exist "%PROJECT_ROOT%\pyproject.toml" (
+    if not defined GITHUB_ROOT set "GITHUB_ROOT=C:\github"
+    set "PROJECT_ROOT=%GITHUB_ROOT%\miscprojects\whisper-transcribe"
+)
 
 if not exist "%PROJECT_ROOT%\pyproject.toml" (
     echo Error: Cannot find project at %PROJECT_ROOT% 1>&2
