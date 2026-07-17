@@ -148,6 +148,8 @@ events; documented in README alongside `--format narrative`.
 
 ### 11. Narrative chronicle (feature expansion)
 
+**Phase 1 fixed (2026-06):** `narrative.py` implements `render(state) -> str`; `cli.py run --format narrative` is wired and working. Covers world intro, era paragraphs with thematic names, conflict/event prose, nation deaths, and final standings. Phases 2–6 remain open.
+
 Transform the simulation's structured data into readable prose. All of the raw
 material is already there — 11 world-event types with effects dicts, a full
 battle log, per-turn territory snapshots via `stream`, and nation traits that
@@ -168,11 +170,11 @@ This keeps narrative parallel to all other output modes and means the same
 renderer works whether state came from an inline simulation, a saved JSON
 file, or (eventually) a live server. No special subcommand needed.
 
-#### Phase 1 — Chronicle (MVP)
-Add `--format narrative` to `cli.py run`. Implement `narrative.py` with a
-`render(state) -> str` function. Prints a text account organised into eras.
+#### ~~Phase 1 — Chronicle (MVP)~~
+~~Add `--format narrative` to `cli.py run`. Implement `narrative.py` with a
+`render(state) -> str` function. Prints a text account organised into eras.~~
 
-- **World opening**: seed, map character (terrain mix, resource values), nations
+~~- **World opening**: seed, map character (terrain mix, resource values), nations
   and their starting traits.
 - **Era paragraphs**: group turns into ~100-turn chunks. Each era gets a
   paragraph covering who was expanding, who was at war, and what world events
@@ -181,10 +183,10 @@ Add `--format narrative` to `cli.py run`. Implement `narrative.py` with a
   sentence rather than being folded into the era summary. Assassinations,
   civil wars, and nation deaths always get called out individually.
 - **Closing standings**: final territory rankings, surviving nations, notable
-  records (most battles won, largest population reached, etc.).
+  records (most battles won, largest population reached, etc.).~~
 
-Output flags: `--format text` (default), `--format markdown`, `--format json`
-(structured narrative segments for further processing).
+~~Output flags: `--format text` (default), `--format markdown`, `--format json`
+(structured narrative segments for further processing).~~
 
 #### Phase 2 — Nation Arcs
 Each nation gets a paragraph tracing its own story. Requires the `stream`
