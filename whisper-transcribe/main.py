@@ -207,7 +207,19 @@ def assign_speakers(segments, turns):
 def transcribe_local(audio_path, args):
     from faster_whisper import WhisperModel
     device = args.device if args.device and args.device != "auto" else detect_device()
-    compute_type = "float16" if device == "cuda" else "int8"
+    if args.compute_type and args.compute_type != "auto":
+        compute_type = args.compute_type
+    elif device == "cuda":
+        # float16 is ideal, but Pascal (sm_6x, e.g. GTX 10-series) lacks efficient
+        # fp16 and CTranslate2 rejects it -- fall back to int8 there.
+        try:
+            import torch
+            major = torch.cuda.get_device_capability(0)[0]
+            compute_type = "float16" if major >= 7 else "int8"
+        except Exception:
+            compute_type = "int8"
+    else:
+        compute_type = "int8"
     logging.debug("Loading model '%s' on %s (%s)", args.model, device, compute_type)
     model = WhisperModel(
         args.model,
@@ -253,6 +265,7 @@ Examples:
   python main.py audio.mp3 --out transcript.txt
   python main.py audio.wav --speed 1.5 --out transcript.txt
   python main.py audio.wav --model distil-large-v3 --out transcript.txt
+  python main.py meeting.wav --local --out transcript.txt   # never uses cloud, even if a key is set
 
 Groq API key can be set via GROQ_API_KEY in .env or environment.
 Note: Groq preprocessing requires ffmpeg to be installed.
@@ -268,6 +281,11 @@ Note: Groq preprocessing requires ffmpeg to be installed.
         "--groq-key",
         default=os.environ.get("GROQ_API_KEY"),
         help="Groq API key (or set GROQ_API_KEY env var); uses Groq cloud if provided"
+    )
+    parser.add_argument(
+        "--local",
+        action="store_true",
+        help="Force local transcription even if a Groq key is present (overrides --groq-key / GROQ_API_KEY). Use for audio that must not leave this machine."
     )
 
     # Diarization options (local path only)
@@ -313,6 +331,12 @@ Note: Groq preprocessing requires ffmpeg to be installed.
         default=None,
         choices=["cpu", "cuda", "auto"],
         help="Device for local transcription (default: auto-detect); ignored when using Groq"
+    )
+    parser.add_argument(
+        "--compute-type",
+        default="auto",
+        choices=["auto", "float16", "int8", "int8_float16", "float32"],
+        help="CTranslate2 compute type (default: auto - float16 on Turing+ GPUs, int8 on Pascal/CPU); ignored when using Groq"
     )
     parser.add_argument(
         "-l", "--language",
@@ -368,6 +392,10 @@ Note: Groq preprocessing requires ffmpeg to be installed.
 
     args = parser.parse_args()
     setup_logging(verbose=args.verbose, quiet=args.quiet)
+
+    if args.local and args.groq_key:
+        logging.debug("--local set; ignoring Groq key and transcribing locally")
+        args.groq_key = None
 
     audio_path = Path(args.audio_file)
     if not audio_path.exists():
