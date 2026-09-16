@@ -37,6 +37,9 @@ def nation_dict(n, turn=0):
         'leader_aggression': round(n.leader_aggression, 2),
         'leader_epithet':    n.leader_epithet(),
         'leader_age':        n.leader_age,
+        'founding_turn':     n.founding_turn,
+        'founding_capital':  n.founding_capital,
+        'founding_towns':    n.founding_towns,
     }
 
 
@@ -120,6 +123,7 @@ def game_summary(game, log_limit=50):
         'events':         [e.to_dict() for e in game.events_history],
         'resource_values': {RESOURCE_NAMES[r]: round(game.world.resource_values[r], 2)
                             for r in range(NUM_RESOURCES)},
+        'territory_log':  [dict(row) for row in game.territory_log],
         'logs':           [{'turn': t, 'msg': m, 'nation': n}
                            for t, m, n in game.logs[-log_limit:]],
     }

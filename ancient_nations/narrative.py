@@ -135,8 +135,10 @@ def _nations_intro(state: dict, battles: list) -> str:
         fought = fought_as.get(name, 0)
         wins   = wins_by.get(name, 0)
         rate   = wins / fought if fought else 0
-        towns  = len(n['towns'])
-        cap    = n['capital'] or '?'
+        # Founding facts are frozen on the snapshot; never read live towns/capital
+        # here — dead nations have none, survivors have grown.
+        towns  = n.get('founding_towns', len(n['towns']))
+        cap    = n.get('founding_capital') or n['capital'] or '?'
 
         trait = n.get('trait')
         if trait:
@@ -154,7 +156,9 @@ def _nations_intro(state: dict, battles: list) -> str:
 
         town_str = f"{towns} {'town' if towns == 1 else 'towns'}"
         cap_str  = f"around {cap}" if cap and cap != '?' else "in an unknown land"
-        lines.append(f"{name}, {character}, founded {cap_str} with {town_str}.")
+        ft = n.get('founding_turn', 0)
+        when = f" in turn {ft}" if ft else ""
+        lines.append(f"{name}, {character}, founded{when} {cap_str} with {town_str}.")
 
     intro = (
         f"Six nations rose from the wilderness: "
@@ -198,7 +202,30 @@ def _era_name(era_idx: int, era_battles: list, era_events: list, total_turns: in
     return labels[min(era_idx - 1, len(labels) - 1)]
 
 
-def _describe_era_conflicts(era_battles: list, nations: list) -> str:
+def _territory_at(state: dict, turn: int) -> dict | None:
+    """{name: tiles} at the end of `turn`, or None if the snapshot can't say."""
+    if turn == state['turn']:
+        return {n['name']: (n['territory'] if n['alive'] else 0) for n in state['nations']}
+    log = state.get('territory_log') or []
+    if 1 <= turn <= len(log):
+        return log[turn - 1]
+    return None
+
+
+def _dominant_at(state: dict, turn: int) -> tuple[str, int] | None:
+    """Who was winning the world at `turn`: alive, most territory, and actually
+    ahead. Returns (name, tiles) or None if nobody leads or the data is missing."""
+    terr = _territory_at(state, turn)
+    if not terr:
+        return None
+    ranked = sorted(terr.items(), key=lambda kv: -kv[1])
+    (top, top_t), second_t = ranked[0], (ranked[1][1] if len(ranked) > 1 else 0)
+    if top_t <= 0 or top_t <= second_t:
+        return None
+    return top, top_t
+
+
+def _describe_era_conflicts(era_battles: list, state: dict, hi: int) -> str:
     """Summarise the wars of an era in a sentence or two."""
     if not era_battles:
         return "No battles were recorded in this period."
@@ -225,19 +252,16 @@ def _describe_era_conflicts(era_battles: list, nations: list) -> str:
 
     sentence = f"The fiercest fighting was between {a} and {b_}: {outcome}."
 
-    # Overall most successful attacker this era
-    attacker_wins = Counter(b['winner'] for b in era_battles
-                            if b['winner'] == b['attacker'])  # won as attacker
-    # Actually just: who won most battles overall
-    overall_wins = Counter(b['winner'] for b in era_battles)
-    if overall_wins:
-        top_nation, top_wins = overall_wins.most_common(1)[0]
-        total = len(era_battles)
-        if top_wins > total * 0.35 and len(pair_count) > 1:
-            sentence += (
-                f"  Across all fronts, {top_nation} proved the dominant force, "
-                f"claiming {top_wins} of {total} battles."
-            )
+    # Who was winning the world at era end. Battle count is not the measure —
+    # a nation can win the most battles and be dead by the era's close.
+    # Battle careers are credited in Records, not here.
+    lead = _dominant_at(state, hi)
+    if lead and len(pair_count) > 1:
+        top_nation, tiles = lead
+        sentence += (
+            f"  Across all fronts, {top_nation} proved the dominant force, "
+            f"holding {tiles} tiles by turn {hi}."
+        )
 
     return sentence
 
@@ -277,7 +301,8 @@ def _describe_era_events(era_events: list) -> str:
         'drought':      lambda e: (
             f"Drought gripped the lands near {tuple(e['location'])}, "
             f"costing {int(e['effects'].get('food_lost', 0))} food across "
-            f"{e['effects'].get('nations_affected', '?')} nation(s)."
+            f"{e['effects'].get('nations_affected', '?')} "
+            f"{'nation' if e['effects'].get('nations_affected') == 1 else 'nations'}."
         ),
         'flood':        lambda e: (
             f"Floods near {tuple(e['location'])} inundated {e['effects'].get('tiles_flooded','?')} tiles"
@@ -357,7 +382,7 @@ def _era_paragraph(era_idx: int, lo: int, hi: int,
         )
 
     # Conflict summary
-    conflict = _describe_era_conflicts(era_bat, state['nations'])
+    conflict = _describe_era_conflicts(era_bat, state, hi)
     if conflict:
         body_parts.append(conflict)
 

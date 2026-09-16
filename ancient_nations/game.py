@@ -60,6 +60,10 @@ class Game:
         self.events_history      : list = []   # WorldEvent objects
         self.pending_recoveries  : list = []   # [(turn, cx, cy, r, type)]
 
+        # Per-turn territory by nation name (index turn-1). Lets the narrative
+        # renderer say who led at an era boundary without replaying the game.
+        self.territory_log       : list[dict] = []
+
         self.log(0, f"=== ANCIENT NATIONS begins. Seed:{self.world.seed} ===")
         self.log(0, f"  {num_nations} nations on a {MAP_SIZE}x{MAP_SIZE} map")
 
@@ -172,6 +176,8 @@ class Game:
         # 7. Snapshot for charts
         for n in self.nations:
             n.snapshot()
+        self.territory_log.append({n.name: (len(n.tiles) if n.alive else 0)
+                                   for n in self.nations})
 
     def _apply_alliance_dividends(self, t):
         """Bilateral resource bonus for Tier 1+ alliances.
@@ -279,7 +285,23 @@ class Game:
             if len(n.tiles) == 0 or (not n.towns and not n.armies):
                 n.alive      = False
                 n.death_turn = t
+                self._clear_diplomacy(n)
                 self.log(t, f"[DEAD] {n.name} has been ELIMINATED!", -1)
+
+    def _clear_diplomacy(self, dead):
+        """A dead nation has no wars, allies, timers, or cooldowns — on either side.
+
+        The single place both sides move; every death path calls it. Historical
+        wars live on in the battle log. A revived slot starts diplomacy fresh.
+        """
+        maps = ('diplomacy', 'peace_timer', 'war_cooldown', 'alliance_cd', 'alliance_age')
+        for m in maps:
+            setattr(dead, m, {})
+        dead.alliance_contradiction_turns = 0
+        for other in self.nations:
+            if other is dead: continue
+            for m in maps:
+                getattr(other, m).pop(dead.idx, None)
 
     # ── peaceful union ────────────────────────────────────────────────────
     def peaceful_annex(self, larger, smaller, merged_trait, turn):
@@ -319,6 +341,7 @@ class Game:
         smaller.death_turn   = turn
         smaller.absorbed_by  = larger.name
         smaller.rebellion_cooldown = UNION_COOLDOWN_TURNS
+        self._clear_diplomacy(smaller)
 
         self.log(turn,
             f"[UNION] {smaller.name} votes to join {larger.name}! "
@@ -357,6 +380,7 @@ class Game:
         loser.death_turn   = turn
         loser.absorbed_by  = winner.name
         loser.rebellion_cooldown = REBELLION_COOLDOWN_TURNS
+        self._clear_diplomacy(loser)
 
         self.log(turn,
             f"[SURR] {loser.name} SURRENDERS to {winner.name}! "
@@ -433,6 +457,9 @@ class Game:
         slot.letter            = slot.name[0].upper()
         slot.leader_aggression = random.uniform(0.55, 1.0)  # rebels lean hawk
         slot.leader_age        = 0
+        slot.founding_turn     = turn
+        slot.founding_capital  = slot.capital.name if slot.capital else None
+        slot.founding_towns    = len(rebel_towns)
         used_ids    = {n.trait['id'] for n in self.nations if n.alive and n is not slot}
         available   = [t for t in self.trait_list if t['id'] not in used_ids]
         slot.trait  = random.choice(available if available else self.trait_list)

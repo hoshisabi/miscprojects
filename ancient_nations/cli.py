@@ -30,6 +30,7 @@ import math
 from engine import GameSession
 from constants import *
 from snapshot import army_dict, battle_dict, nation_dict, tile_dict
+from events import is_notable
 
 
 # ── Session helper ────────────────────────────────────────────────────────────
@@ -142,13 +143,24 @@ def cmd_stream(args):
     s = _open_session(args)
     g = s.game
     from_turn = getattr(args, 'from_turn', None)
+    only_notable = getattr(args, 'notable', False)
     for _ in range(args.turns):
         s.step()
         if from_turn is not None and g.turn < from_turn:
             continue
-        line = json.dumps(s.turn_snapshot())
+        snap = s.turn_snapshot()
+        if only_notable and not _turn_is_notable(snap):
+            continue
+        line = json.dumps(snap)
         sys.stdout.write(line + '\n')
         sys.stdout.flush()
+
+
+def _turn_is_notable(snap):
+    """A turn is worth a session's attention if a notable event fired or a nation died."""
+    if any(is_notable(e) for e in snap['events_this_turn']):
+        return True
+    return any(not n['alive'] and n.get('death_turn') == snap['turn'] for n in snap['nations'])
 
 
 def cmd_battles(args):
@@ -239,9 +251,8 @@ def cmd_summary(args):
         fate = f"absorbed by {ab} at t{dt}" if ab and dt else (f"eliminated at t{dt}" if dt else "eliminated")
         lines.append(f"  ✗ {n['name']} ({trait}) — {fate}")
 
-    # Notable events
-    HIGH_IMPACT = {'civil_war', 'assassination', 'rebellion', 'plague', 'drought', 'earthquake'}
-    notable = [e for e in events if e.get('type') in HIGH_IMPACT]
+    # Notable events — same predicate as `stream --notable`
+    notable = [e for e in events if is_notable(e)]
     notable.sort(key=lambda e: e['turn'])
     if notable:
         lines.append("")
@@ -309,6 +320,8 @@ def build_parser():
     # stream
     st = sub.add_parser('stream', parents=[shared],
                         help='Emit one JSON line per turn (NDJSON)')
+    st.add_argument('--notable', action='store_true',
+                    help='Emit only turns with a notable event (see events.is_notable) or a nation death')
     st.add_argument('--from', dest='from_turn', type=int, default=None, metavar='T',
                     help='Only emit lines for turns >= T (full sim still runs from start)')
 

@@ -42,6 +42,25 @@ EVT_MIGRATION    = 'migration'
 EVT_ASSASSINATION= 'assassination'
 EVT_REBELLION    = 'rebellion'
 
+# ── Notable events ─────────────────────────────────────────────────────────────
+# "Notable" means it mattered, not merely that it fired. Political events are
+# notable by type. Disasters are notable only if they had a non-zero effect.
+NOTABLE_BY_TYPE   = frozenset({EVT_ASSASSINATION, EVT_REBELLION})
+NOTABLE_IF_EFFECT = frozenset({EVT_PLAGUE, EVT_DROUGHT, EVT_EARTHQUAKE})
+
+
+def is_notable(event: dict) -> bool:
+    """Predicate over an event dict (WorldEvent.to_dict()). Shared by `summary`
+    and `stream --notable` so both agree on what a session should be told about."""
+    t = event.get('type')
+    if t in NOTABLE_BY_TYPE:
+        return True
+    if t in NOTABLE_IF_EFFECT:
+        effects = event.get('effects') or {}
+        return any(isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0
+                   for v in effects.values())
+    return False
+
 
 class WorldEvent:
     def __init__(self, event_type, turn, cx, cy, radius, magnitude, description, effects):
@@ -189,8 +208,9 @@ class EventSystem:
                 effects['nations_affected'] += 1
                 effects['food_lost'] += food_penalty
 
+        n_aff = effects['nations_affected']
         desc = (f"DROUGHT near ({cx},{cy}) radius {radius}! "
-                f"{effects['nations_affected']} nations lost {effects['food_lost']} food.")
+                f"{n_aff} nation{'' if n_aff == 1 else 's'} lost {effects['food_lost']} food.")
         evt = WorldEvent(EVT_DROUGHT, turn, cx, cy, radius, mag, desc, effects)
         self.history.append(evt)
         self.game.log(turn, f"[{EVENT_LABEL[EVT_DROUGHT]}] {desc}")

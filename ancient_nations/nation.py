@@ -107,6 +107,12 @@ class Nation:
                         world.set_tile_owner(nx, ny, idx)
                         self.tiles.add((nx, ny))
 
+        # Founding facts, frozen at creation so the chronicle can describe the
+        # founding without reading live state (dead nations have no towns).
+        self.founding_turn    = 0
+        self.founding_capital = cap.name
+        self.founding_towns   = 1
+
         self._world = world
 
     # ── trait helpers ─────────────────────────────────────────────────────
