@@ -13,3 +13,7 @@ wheels/
 .vscode/
 # Virtual environments
 .venv
+
+# Relay mailbox junctions (point into other agents' trees; never commit)
+/wren/
+/rowan/
