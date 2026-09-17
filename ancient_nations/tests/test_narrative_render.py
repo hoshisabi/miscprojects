@@ -143,5 +143,47 @@ class TestDominantForceSentence(unittest.TestCase):
         self.assertIn('Borum proved the dominant force', out)
 
 
+class TestTerritoryLookup(unittest.TestCase):
+    """territory_log is sampled, so lookups must handle turns between samples."""
+
+    LOG = [
+        {'turn': 10, 'territory': {'Aegia': 100, 'Borum': 50}},
+        {'turn': 20, 'territory': {'Aegia': 200, 'Borum': 60}},
+        {'turn': 30, 'territory': {'Aegia': 300, 'Borum': 70}},
+    ]
+
+    def _state(self):
+        return state([nation('Aegia', 'Militarist', territory=999),
+                      nation('Borum', 'Builder', territory=80)],
+                     turn=40, territory_log=self.LOG)
+
+    def test_exact_sample_is_used(self):
+        self.assertEqual(narrative._territory_at(self._state(), 20)['Aegia'], 200)
+
+    def test_between_samples_falls_back_to_the_nearest_earlier_one(self):
+        self.assertEqual(narrative._territory_at(self._state(), 27)['Aegia'], 200)
+
+    def test_final_turn_comes_from_live_rows_not_the_log(self):
+        self.assertEqual(narrative._territory_at(self._state(), 40)['Aegia'], 999)
+
+    def test_before_the_first_sample_is_unknown(self):
+        self.assertIsNone(narrative._territory_at(self._state(), 5))
+
+    def test_missing_log_is_unknown_rather_than_an_error(self):
+        st = state([nation('Aegia', 'Militarist')], turn=40)
+        self.assertIsNone(narrative._territory_at(st, 20))
+
+    def test_a_renamed_slot_is_described_by_the_name_it_had_then(self):
+        """A revived slot is renamed, so each sample carries the names in use at
+        that turn. Looking up an early era must not use the later name."""
+        log = [{'turn': 10, 'territory': {'Aegia': 500, 'Borum': 10}},
+               {'turn': 30, 'territory': {'Cirra': 700, 'Borum': 10}}]
+        st = state([nation('Cirra', 'Zealot', territory=700),
+                    nation('Borum', 'Builder', territory=10)],
+                   turn=40, territory_log=log)
+        self.assertEqual(narrative._dominant_at(st, 10), ('Aegia', 500))
+        self.assertEqual(narrative._dominant_at(st, 30), ('Cirra', 700))
+
+
 if __name__ == '__main__':
     unittest.main()

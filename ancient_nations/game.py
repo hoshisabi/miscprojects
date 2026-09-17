@@ -31,6 +31,13 @@ class CombatManager:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Territory is sampled this often for the chronicle. Era boundaries fall on
+# multiples of 50, so a stride of 10 always lands on one; if era sizing ever
+# changes, the renderer falls back to the nearest earlier sample rather than
+# going silent. The final turn is read from the live snapshot, not the log.
+TERRITORY_LOG_EVERY = 10
+
+
 class Game:
     def __init__(self, seed=None, num_nations=NUM_NATIONS):
         self.turn     = 0
@@ -60,8 +67,11 @@ class Game:
         self.events_history      : list = []   # WorldEvent objects
         self.pending_recoveries  : list = []   # [(turn, cx, cy, r, type)]
 
-        # Per-turn territory by nation name (index turn-1). Lets the narrative
-        # renderer say who led at an era boundary without replaying the game.
+        # Territory by nation name, sampled every TERRITORY_LOG_EVERY turns, so the
+        # narrative renderer can say who led at an era boundary without replaying the
+        # game. Sampled rather than per-turn because this is serialized on every
+        # snapshot: per-turn repeated the nation-name keys once per turn and cost
+        # ~23% of a 500-turn payload to answer at most a dozen questions.
         self.territory_log       : list[dict] = []
 
         self.log(0, f"=== ANCIENT NATIONS begins. Seed:{self.world.seed} ===")
@@ -176,8 +186,12 @@ class Game:
         # 7. Snapshot for charts
         for n in self.nations:
             n.snapshot()
-        self.territory_log.append({n.name: (len(n.tiles) if n.alive else 0)
-                                   for n in self.nations})
+        if t % TERRITORY_LOG_EVERY == 0:
+            self.territory_log.append({
+                'turn': t,
+                'territory': {n.name: (len(n.tiles) if n.alive else 0)
+                              for n in self.nations},
+            })
 
     def _apply_alliance_dividends(self, t):
         """Bilateral resource bonus for Tier 1+ alliances.

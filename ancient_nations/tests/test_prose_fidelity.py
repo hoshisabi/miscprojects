@@ -92,6 +92,19 @@ class TestProseFidelity(unittest.TestCase):
             self.assertEqual(n['founding_turn'], 0, n['name'])
             self.assertIsInstance(n['founding_capital'], str, n['name'])
 
+    def test_territory_log_is_sampled_not_per_turn(self):
+        """Sampled every 10 turns; per-turn cost ~23% of the payload to answer a
+        dozen questions. Era boundaries are multiples of 50, so every boundary
+        still lands on a sample and the era sentences stay exact."""
+        log = self.state['territory_log']
+        turns = self.state['turn']
+        self.assertEqual([row['turn'] for row in log],
+                         list(range(10, turns + 1, 10)))
+        for row in log:
+            self.assertEqual(set(row), {'turn', 'territory'})
+            self.assertEqual(set(row['territory']),
+                             {n['name'] for n in self.state['nations']})
+
     # -- 2. Era "dominant force" -----------------------------------------------
 
     def _territory_leader(self):

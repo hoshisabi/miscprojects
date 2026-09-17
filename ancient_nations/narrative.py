@@ -210,13 +210,21 @@ def _era_name(era_idx: int, era_battles: list, era_events: list, total_turns: in
 
 
 def _territory_at(state: dict, turn: int) -> dict | None:
-    """{name: tiles} at the end of `turn`, or None if the snapshot can't say."""
+    """{name: tiles} as of `turn`, or None if the snapshot can't say.
+
+    The final turn comes from the live nation rows. Earlier turns come from the
+    sampled territory_log; if `turn` falls between samples we use the nearest
+    earlier one, so the sentence degrades to "as of shortly before" rather than
+    disappearing. Names are stored per sample because a revived slot is renamed,
+    and an era must be described with the name in use at the time.
+    """
     if turn == state['turn']:
         return {n['name']: (n['territory'] if n['alive'] else 0) for n in state['nations']}
-    log = state.get('territory_log') or []
-    if 1 <= turn <= len(log):
-        return log[turn - 1]
-    return None
+    best = None
+    for row in state.get('territory_log') or []:
+        if row['turn'] <= turn and (best is None or row['turn'] > best['turn']):
+            best = row
+    return best['territory'] if best else None
 
 
 def _dominant_at(state: dict, turn: int) -> tuple[str, int] | None:
