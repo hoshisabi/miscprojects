@@ -30,6 +30,14 @@ def _list_names(names: list[str], conjunction='and') -> str:
     return ', '.join(names[:-1]) + f', {conjunction} {names[-1]}'
 
 
+def _article(word: str) -> str:
+    """'a' or 'an' for a following word. Trait names are the only callers today,
+    so this is spelling-based, not phonetic — good enough for Expansionist/Zealot,
+    and the one place to fix if a trait ever starts with a silent consonant."""
+    first = str(word)[:1].lower()
+    return 'an' if first and first in 'aeiou' else 'a'
+
+
 def _approx_pop(n: int) -> str:
     if n >= 1_000_000:
         return f"{n/1_000_000:.1f} million"
@@ -143,8 +151,7 @@ def _nations_intro(state: dict, battles: list) -> str:
         trait = n.get('trait')
         if trait:
             tlow = trait.lower()
-            article = 'an' if tlow[:1] in 'aeiou' else 'a'
-            character = f"{article} {tlow} people"
+            character = f"{_article(tlow)} {tlow} people"
         elif rate >= 0.70:
             character = "a fearsome military power"
         elif rate >= 0.55:
@@ -284,13 +291,14 @@ def _describe_era_events(era_events: list) -> str:
         ),
         'assassination': lambda e: (
             f"An assassin's blade ended the reign of {e['effects'].get('nation','a ruler')}'s leader"
-            + (f", ushering in a {e['effects']['new_trait']} era"
+            + (f", ushering in {_article(e['effects']['new_trait'])} {e['effects']['new_trait']} era"
                if e['effects'].get('trait_changed') else "") + "."
         ),
         'rebellion':    lambda e: (
             f"Civil war tore {e['effects'].get('parent','a great power')} apart: "
             f"{e['effects'].get('rebel','rebels')} rose with "
-            f"{e['effects'].get('tiles_split', '?')} tiles, declaring themselves a "
+            f"{e['effects'].get('tiles_split', '?')} tiles, declaring themselves "
+            f"{_article(e['effects'].get('trait','new'))} "
             f"{e['effects'].get('trait','new')} state."
         ),
         'plague':       lambda e: (
