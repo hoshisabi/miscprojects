@@ -35,6 +35,7 @@ def nation_dict(n, turn=0):
         'death_turn':       n.death_turn,
         'absorbed_by':      n.absorbed_by,
         'leader_aggression': round(n.leader_aggression, 2),
+        'leader_name':       n.leader_name,
         'leader_epithet':    n.leader_epithet(),
         'leader_age':        n.leader_age,
         'founding_turn':     n.founding_turn,

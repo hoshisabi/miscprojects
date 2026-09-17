@@ -242,8 +242,11 @@ def cmd_summary(args):
     lines.append("Standings:")
     for i, n in enumerate(alive, 1):
         trait = n.get('trait') or '?'
+        ruler = n.get('leader_name')
+        ruled = f", ruled by {ruler} {n.get('leader_epithet', '')}".rstrip() if ruler else ''
         lines.append(f"  {i}. {n['name']} ({trait}) — {n['territory']} tiles, "
-                     f"pop {n['population']:,}, {n['battles_won']}W/{n['battles_lost']}L")
+                     f"pop {n['population']:,}, {n['battles_won']}W/{n['battles_lost']}L"
+                     f"{ruled}")
     for n in dead:
         dt = n.get('death_turn')
         ab = n.get('absorbed_by')

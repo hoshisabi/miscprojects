@@ -90,7 +90,7 @@ class Game:
                                for sx,sy in spawned)
                 if dist_ok:
                     nation = Nation(i, self._namegen.generate(), NATION_COLORS[i], x, y,
-                                    self.world)
+                                    self.world, self._namegen)
                     nation.trait = self._trait_pool[i % len(self._trait_pool)]
                     self.nations.append(nation)
                     spawned.append((x,y))
@@ -109,7 +109,7 @@ class Game:
                     if d > best_dist:
                         best_dist=d; bx,by=px,py
                 nation = Nation(i, self._namegen.generate(), NATION_COLORS[i], bx, by,
-                                self.world)
+                                self.world, self._namegen)
                 nation.trait = self._trait_pool[i % len(self._trait_pool)]
                 self.nations.append(nation)
                 spawned.append((bx,by))
@@ -470,6 +470,7 @@ class Game:
         slot.name              = self._namegen.generate()
         slot.letter            = slot.name[0].upper()
         slot.leader_aggression = random.uniform(0.55, 1.0)  # rebels lean hawk
+        slot.leader_name       = self._namegen.generate_ruler()
         slot.leader_age        = 0
         slot.founding_turn     = turn
         slot.founding_capital  = slot.capital.name if slot.capital else None

@@ -44,6 +44,12 @@ SUFFIXES = [
     'ikos', 'anus', 'ica', 'ara',
 ]
 
+# Endings that read as a person rather than a place. Rulers draw from the same
+# PREFIXES so a dynasty sounds like it belongs to the world.
+RULER_SUFFIXES = [
+    'arius', 'ius', 'us', 'ander', 'anos', 'ax', 'ar', 'ec', 'ion', 'ath',
+]
+
 
 # ── Generator ─────────────────────────────────────────────────────────────────
 
@@ -58,6 +64,24 @@ class NationNameGenerator:
     def __init__(self):
         self._used_names:   set[str] = set()
         self._used_letters: set[str] = set()
+
+    def generate_ruler(self) -> str:
+        """Return a ruler name unused anywhere in this game.
+
+        Shares _used_names with nation names, so no ruler is ever a namesake of
+        a nation — "Eldia's ruler Eldia" would be unreadable in a chronicle.
+        Does not touch _used_letters: that constraint exists to keep ASCII map
+        markers distinct, and rulers are not on the map.
+        """
+        for _ in range(300):
+            name = random.choice(PREFIXES) + random.choice(RULER_SUFFIXES)
+            if name not in self._used_names:
+                self._used_names.add(name)
+                return name
+
+        name = f'Rex{len(self._used_names) + 1}'
+        self._used_names.add(name)
+        return name
 
     def generate(self) -> str:
         """

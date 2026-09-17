@@ -4,12 +4,19 @@ Prose fidelity on seed -521411348 (Rowan's seed, 100 turns).
 Vellum specified the intended sentences on 2026-09-16 (Vellum/VELLUM_TO_VESPER.md).
 These tests assert those *rules* against the JSON snapshot of the same run, so
 they hold on whatever world the seed produces after a sim change, rather than
-freezing one world's constants. The six founding lines are hard-coded because
-spawn happens before turn 1 and is unaffected by turn logic.
+freezing one world's constants. Nothing here hard-codes a nation name, a ruler,
+or a turn number.
 
-Note (2026-09-16): clearing dead-nation diplomacy changed this seed's history
-after t43 — the old world had Solos "allied" to dead Leria and Eldia/Zorara "at
-war" with her, which gated real decisions. Rowan's saved JSON is the pre-fix world.
+That was learned twice. On 2026-09-16 clearing dead-nation diplomacy changed
+this seed's history after t43. On 2026-09-17 naming rulers changed it again from
+turn 0, because generating a ruler name consumes randomness during spawn, so
+every nation after the first got a different name. The six founding sentences
+had been hard-coded on the reasoning that spawn precedes turn 1 and no turn
+logic could move it — true, and beside the point, since the change was to spawn
+itself. They are derived from the snapshot now.
+
+New mechanics change results by definition, so a test that pins a world is a
+test that fails on the next feature. Pin rules; derive facts.
 
 Run from ancient_nations/:
     uv run python -m unittest tests.test_prose_fidelity -v
@@ -64,27 +71,30 @@ class TestProseFidelity(unittest.TestCase):
 
     # -- 1. Founding paragraph -------------------------------------------------
 
-    FOUNDING_LINES = [
-        "Leria, a militarist people, founded around Roma with 1 town.",
-        "Eldia, an expansionist people, founded around Thebaia with 1 town.",
-        "Zorara, a zealot people, founded around Perseon with 1 town.",
-        "Nerara, a diplomat people, founded around Abydica with 1 town.",
-        "Solos, a merchant people, founded around Uticaax with 1 town.",
-        "Canius, a builder people, founded around Borysopolis with 1 town.",
-    ]
-
     def test_founding_lines_match_founding_facts(self):
-        for line in self.FOUNDING_LINES:
-            self.assertIn(line, self.narrative)
+        """Every nation's founding sentence must match its own founding facts."""
+        for n in self.state['nations']:
+            trait = (n['trait'] or '').lower()
+            article = 'an' if trait[:1] in 'aeiou' else 'a'
+            towns = n['founding_towns']
+            when = f" in turn {n['founding_turn']}" if n['founding_turn'] else ""
+            expected = (f"{n['name']}, {article} {trait} people, founded{when} "
+                        f"around {n['founding_capital']} with "
+                        f"{towns} town{'' if towns == 1 else 's'}.")
+            self.assertIn(expected, self.narrative)
 
     def test_no_nation_founded_in_unknown_land(self):
         self.assertNotIn('unknown land', self.narrative)
         self.assertNotIn('with 0 towns', self.narrative)
 
     def test_survivor_not_credited_with_final_town_count_at_founding(self):
-        eldia = next(n for n in self.state['nations'] if n['name'] == 'Eldia')
-        self.assertGreater(len(eldia['towns']), 1, 'fixture assumes Eldia grew past one town')
-        self.assertNotIn(f"founded around Thebaia with {len(eldia['towns'])} towns", self.narrative)
+        """The original bug: the founding line read towns off the final snapshot."""
+        grown = [n for n in self.state['nations'] if len(n['towns']) > n['founding_towns']]
+        self.assertTrue(grown, 'fixture needs a nation that built towns after founding')
+        for n in grown:
+            self.assertNotIn(
+                f"founded around {n['founding_capital']} with {len(n['towns'])} towns",
+                self.narrative)
 
     def test_snapshot_carries_founding_facts(self):
         for n in self.state['nations']:
@@ -170,33 +180,32 @@ class TestProseFidelity(unittest.TestCase):
 
 
 class TestNotableFilter(unittest.TestCase):
-    """Seed 1 / 100 turns has a plague that killed (t16) and disasters that touched
-    nothing (t28, t72), so both branches of `is_notable` are exercised by `summary`."""
+    """is_notable's branches, without needing a seed that happens to show both.
 
-    @classmethod
-    def setUpClass(cls):
-        rc, out, err = run_cli('run', '--seed', '1', '--turns', '100')
-        assert rc == 0, err
-        cls.events = json.loads(out)['events']
-        rc, cls.summary, err = run_cli('summary', '--seed', '1', '--turns', '100')
-        assert rc == 0, err
-
-    def test_summary_keeps_disasters_with_effect_and_drops_the_rest(self):
-        disasters = [e for e in self.events if e['type'] in ('plague', 'drought', 'earthquake')]
-        kept    = [e for e in disasters if is_notable(e)]
-        dropped = [e for e in disasters if not is_notable(e)]
-        self.assertTrue(kept, 'fixture needs a disaster that mattered; pick another seed')
-        self.assertTrue(dropped, 'fixture needs a disaster with zero effect; pick another seed')
-        for e in kept:
-            self.assertIn(f"t{e['turn']:>4}: ", self.summary)
-        for e in dropped:
-            self.assertNotIn(f"t{e['turn']:>4}: ", self.summary)
+    This used to run a second simulation on seed 1, chosen because it produced a
+    plague that killed and two disasters that touched nothing. Naming rulers
+    changed seed 1 too and the zero-effect disasters vanished. Property-selected
+    seeds do not survive mechanic changes, so the predicate is tested directly
+    and the integration side only asserts that `summary` agrees with it.
+    """
 
     def test_political_events_are_notable_by_type_regardless_of_effects(self):
         self.assertTrue(is_notable({'type': 'assassination', 'effects': {}}))
         self.assertTrue(is_notable({'type': 'rebellion', 'effects': {'tiles_split': 0}}))
+
+    def test_disasters_need_a_non_zero_effect(self):
+        self.assertTrue(is_notable({'type': 'plague', 'effects': {'pop_lost': 71, 'armies_weakened': 3}}))
+        self.assertTrue(is_notable({'type': 'drought', 'effects': {'food_lost': 40, 'nations_affected': 1}}))
         self.assertFalse(is_notable({'type': 'plague', 'effects': {'pop_lost': 0, 'armies_weakened': 0}}))
-        self.assertFalse(is_notable({'type': 'migration', 'effects': {'pop_gained': 500}}))
+        self.assertFalse(is_notable({'type': 'drought', 'effects': {'food_lost': 0, 'nations_affected': 0}}))
+        self.assertFalse(is_notable({'type': 'earthquake', 'effects': {}}))
+
+    def test_quiet_event_types_are_never_notable(self):
+        for t in ('migration', 'gold_rush', 'flood', 'forest_fire', 'volcanic_ash', 'rich_vein'):
+            self.assertFalse(is_notable({'type': t, 'effects': {'tiles': 500}}), t)
+
+    def test_booleans_do_not_count_as_a_non_zero_effect(self):
+        self.assertFalse(is_notable({'type': 'plague', 'effects': {'contained': True}}))
 
 
 if __name__ == '__main__':

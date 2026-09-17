@@ -39,11 +39,11 @@ class NationAI:
         if self.n.leader_age > 60:
             death_chance = (self.n.leader_age - 60) * 0.003   # ~12 % at turn 100
             if random.random() < death_chance:
-                old_ep = self.n.leader_epithet()
+                old_title = self.n.leader_title()
                 self.n.new_leader()
                 self.game.log(turn,
-                    f"  {self.n.name}'s ruler {old_ep} dies of old age. "
-                    f"Successor rules as {self.n.leader_epithet()}.",
+                    f"  {self.n.name}'s ruler {old_title} dies of old age. "
+                    f"{self.n.leader_title()} succeeds.",
                     self.n.idx)
                 return
 
@@ -58,11 +58,11 @@ class NationAI:
             if len(hist) >= 5 and hist[-1] < hist[-5] * 0.85:
                 overthrow += 0.05
         if overthrow > 0 and random.random() < overthrow:
-            old_ep = self.n.leader_epithet()
+            old_title = self.n.leader_title()
             self.n.new_leader(crisis=True)
             self.game.log(turn,
-                f"  {self.n.name}: {old_ep} OVERTHROWN! "
-                f"New ruler {self.n.leader_epithet()} seizes power.",
+                f"  {self.n.name}: {old_title} OVERTHROWN! "
+                f"{self.n.leader_title()} seizes power.",
                 self.n.idx)
 
     # ── diplomacy ─────────────────────────────────────────────────────────
@@ -192,7 +192,7 @@ class NationAI:
             other.make_peace(self.n.idx, turn)
             self.game.log(turn,
                 f"[peace]  {self.n.name} sues for peace; {other.name} "
-                f"{other.leader_epithet()} accepts.",
+                f"{other.leader_title()} accepts.",
                 self.n.idx)
 
     # ── alliance helpers ──────────────────────────────────────────────────

@@ -397,12 +397,16 @@ class EventSystem:
         old_trait  = target.trait
         old_name   = old_trait['name'] if old_trait else 'Unknown'
         old_ep     = target.leader_epithet()
+        old_ruler  = target.leader_name
+        old_title  = target.leader_title()
         effects    = {'nation': target.name, 'old_trait': old_name, 'new_trait': old_name,
-                      'trait_changed': False}
+                      'trait_changed': False, 'ruler_killed': old_ruler}
 
         # Always install a new (crisis) leader on assassination
         target.new_leader(crisis=True)
         new_ep = target.leader_epithet()
+        new_title = target.leader_title()
+        effects['ruler_successor'] = target.leader_name
 
         if random.random() < ASSN_CHANGE_CHANCE:
             # New leader may also shift national doctrine
@@ -422,12 +426,12 @@ class EventSystem:
                 })
 
         if effects['trait_changed']:
-            desc = (f"ASSASSINATION! {target.name}'s leader {old_ep} is dead! "
-                    f"New ruler {new_ep} brings {effects['new_trait']} vision "
+            desc = (f"ASSASSINATION! {target.name}'s leader {old_title} is dead! "
+                    f"{new_title} brings {effects['new_trait']} vision "
                     f"(was {old_name}).")
         else:
-            desc = (f"ASSASSINATION! {target.name}'s leader {old_ep} is dead! "
-                    f"New ruler {new_ep} upholds {old_name} tradition.")
+            desc = (f"ASSASSINATION! {target.name}'s leader {old_title} is dead! "
+                    f"{new_title} upholds {old_name} tradition.")
 
         evt = WorldEvent(EVT_ASSASSINATION, turn, cx, cy, 0, mag, desc, effects)
         self.history.append(evt)

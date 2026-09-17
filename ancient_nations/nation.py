@@ -24,7 +24,7 @@ class DiplomaticStatus:
 
 
 class Nation:
-    def __init__(self, idx, name, color, capital_x, capital_y, world):
+    def __init__(self, idx, name, color, capital_x, capital_y, world, namegen):
         self.idx        = idx
         self.name       = name
         self.color      = color
@@ -69,7 +69,12 @@ class Nation:
         self.rebellion_cooldown = 0
 
         # Leader personality: 0 = dove, 1 = hawk.  Affects war/peace thresholds.
+        # The name is the stable handle across a reign; the epithet is derived from
+        # aggression and can contradict the nation's trait, which is why events
+        # should refer to rulers by name.
+        self._namegen          = namegen
         self.leader_aggression = random.uniform(0.2, 0.8)
+        self.leader_name       = namegen.generate_ruler()
         self.leader_age        = 0   # turns the current ruler has been in power
 
         # Allied to two nations who are at war with each other — builds until break.
@@ -129,6 +134,10 @@ class Nation:
                 return epithet
         return 'the Pragmatic'
 
+    def leader_title(self):
+        """Name plus epithet, e.g. "Caldarius the Pacifist" — the display form."""
+        return f"{self.leader_name} {self.leader_epithet()}"
+
     def new_leader(self, crisis=False):
         """Install a new ruler.  Crisis successions skew toward extremes."""
         if crisis:
@@ -139,6 +148,7 @@ class Nation:
                 self.leader_aggression = random.uniform(0.0, 0.35)
         else:
             self.leader_aggression = random.uniform(0.1, 0.9)
+        self.leader_name = self._namegen.generate_ruler()
         self.leader_age = 0
 
     # ── capitals / cities ──────────────────────────────────────────────────

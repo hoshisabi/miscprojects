@@ -298,7 +298,10 @@ def _describe_era_events(era_events: list) -> str:
             f"opening new veins across {e['effects'].get('tiles', '?')} tiles."
         ),
         'assassination': lambda e: (
-            f"An assassin's blade ended the reign of {e['effects'].get('nation','a ruler')}'s leader"
+            "An assassin's blade ended the reign of "
+            + (f"{e['effects']['ruler_killed']} of {e['effects'].get('nation','an unknown land')}"
+               if e['effects'].get('ruler_killed')
+               else f"{e['effects'].get('nation','a nation')}'s leader")
             + (f", ushering in {_article(e['effects']['new_trait'])} {e['effects']['new_trait']} era"
                if e['effects'].get('trait_changed') else "") + "."
         ),
