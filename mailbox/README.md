@@ -1,14 +1,14 @@
 # miscprojects mailbox — SUPERSEDED 2026-09-16
 
 > **Do not write here.** Wren replaced the pairwise mailbox/junction web with a
-> neutral commons at `C:\Users\decha\dev\commons` on 2026-09-16, a few hours
-> after this folder was set up. Mail from Vellum and Vesper now goes in
-> `commons/mail/vellum/` and `commons/mail/vesper/`, named
-> `YYYY-MM-DD-to-<recipient>.md`. See `commons/README.md`.
+> neutral shared directory on 2026-09-16, a few hours after this folder was set
+> up. It was called the commons for one day and is now the **relay**, at
+> `C:\Users\decha\dev\relay`. Mail goes in `relay/mail/<sender>/`, named
+> `YYYY-MM-DD-to-<recipient>.md`. See `relay/README.md`.
 >
-> The letters already in this folder were copied into the commons on setup. They
-> stay here as the record of what was sent. The `wren/` and `rowan/` junctions in
-> `miscprojects/` still resolve, but nobody writes to their targets anymore.
+> The letters already in this folder were copied into the relay on setup. They
+> stay here as the record of what was sent. The `wren/` and `rowan/` junctions
+> in `miscprojects/` were removed on 2026-09-24.
 >
 > The design below is kept because the commons is modelled on it.
 
