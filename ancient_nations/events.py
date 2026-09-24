@@ -396,16 +396,13 @@ class EventSystem:
 
         old_trait  = target.trait
         old_name   = old_trait['name'] if old_trait else 'Unknown'
-        old_ep     = target.leader_epithet()
         old_ruler  = target.leader_name
-        old_title  = target.leader_title()
+        old_title  = target.leader_chronicle_title()
         effects    = {'nation': target.name, 'old_trait': old_name, 'new_trait': old_name,
                       'trait_changed': False, 'ruler_killed': old_ruler}
 
         # Always install a new (crisis) leader on assassination
         target.new_leader(crisis=True)
-        new_ep = target.leader_epithet()
-        new_title = target.leader_title()
         effects['ruler_successor'] = target.leader_name
 
         if random.random() < ASSN_CHANGE_CHANCE:
@@ -424,6 +421,8 @@ class EventSystem:
                     'from_trait_id': (old_trait or {}).get('id'),
                     'to_trait_id': new_trait['id'],
                 })
+
+        new_title = target.leader_chronicle_title()
 
         if effects['trait_changed']:
             desc = (f"ASSASSINATION! {target.name}'s leader {old_title} is dead! "

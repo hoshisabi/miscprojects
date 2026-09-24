@@ -13,8 +13,9 @@ Usage
   python cli.py query --seed 42 --turns 100 --nation Romanus
   python cli.py query --seed 42 --turns 100 --region 3,4
   python cli.py query --seed 42 --turns 800 --events --from 600   # events with turn >= 600
+  python cli.py query --seed 42 --turns 800 --events --from 400 --to 600  # 400 <= turn <= 600
   python cli.py stream --seed 42 --turns 50            # NDJSON one line per turn
-  python cli.py stream --seed 42 --turns 200 --from 150   # only emit turns >= 150
+  python cli.py stream --seed 42 --turns 200 --from 150 --to 180  # emit turns 150–180
   python cli.py battles --seed 42 --turns 200
   python cli.py map    --seed 42              # ASCII map: no turns simulated unless --turns set
 
@@ -42,6 +43,27 @@ def _open_session(args) -> GameSession:
     return s
 
 
+def _turn_bounds(args):
+    """Inclusive output window. None is unbounded on that side.
+
+    Does not shorten the simulation: --turns is still how long the game runs.
+    Exits before any sim work if --to is earlier than --from.
+    """
+    lo = getattr(args, 'from_turn', None)
+    hi = getattr(args, 'to_turn', None)
+    if lo is not None and hi is not None and hi < lo:
+        _error({'error': f'--to {hi} is before --from {lo}'}, getattr(args, 'pretty', False))
+    return lo, hi
+
+
+def _turn_in_window(turn, lo, hi) -> bool:
+    if lo is not None and turn < lo:
+        return False
+    if hi is not None and turn > hi:
+        return False
+    return True
+
+
 # ── Commands ──────────────────────────────────────────────────────────────────
 
 def cmd_run(args):
@@ -63,11 +85,10 @@ def cmd_run(args):
 
 def cmd_query(args):
     """Query specific aspect of game state after N turns."""
+    from_turn, to_turn = _turn_bounds(args)
     s = _open_session(args)
     s.run_turns(args.turns)
     g = s.game
-
-    from_turn = getattr(args, 'from_turn', None)
 
     if args.tile:
         x, y = map(int, args.tile.split(','))
@@ -121,32 +142,30 @@ def cmd_query(args):
         }, args.pretty)
 
     elif args.events:
-        ev = g.events_history
-        if from_turn is not None:
-            ev = [e for e in ev if e.turn >= from_turn]
+        ev = [e for e in g.events_history if _turn_in_window(e.turn, from_turn, to_turn)]
         _print({
             'turn':   g.turn,
             'events': [e.to_dict() for e in ev],
         }, args.pretty)
 
     else:
-        # Default: full summary
+        # Default: full summary. A window filters world events only, same as --from always did.
         out = s.snapshot()
-        if from_turn is not None:
-            out['events'] = [e for e in out['events'] if e['turn'] >= from_turn]
+        if from_turn is not None or to_turn is not None:
+            out['events'] = [e for e in out['events'] if _turn_in_window(e['turn'], from_turn, to_turn)]
             out['events_total'] = len(out['events'])
         _print(out, args.pretty)
 
 
 def cmd_stream(args):
     """Run turn by turn, emitting one JSON line per turn (NDJSON)."""
+    from_turn, to_turn = _turn_bounds(args)
     s = _open_session(args)
     g = s.game
-    from_turn = getattr(args, 'from_turn', None)
     only_notable = getattr(args, 'notable', False)
     for _ in range(args.turns):
         s.step()
-        if from_turn is not None and g.turn < from_turn:
+        if not _turn_in_window(g.turn, from_turn, to_turn):
             continue
         snap = s.turn_snapshot()
         if only_notable and not _turn_is_notable(snap):
@@ -242,8 +261,11 @@ def cmd_summary(args):
     lines.append("Standings:")
     for i, n in enumerate(alive, 1):
         trait = n.get('trait') or '?'
-        ruler = n.get('leader_name')
-        ruled = f", ruled by {ruler} {n.get('leader_epithet', '')}".rstrip() if ruler else ''
+        chronicle = n.get('leader_chronicle') or (
+            f"{n['leader_name']} {n.get('leader_epithet', '')}".rstrip()
+            if n.get('leader_name') else ''
+        )
+        ruled = f", ruled by {chronicle}" if chronicle else ''
         lines.append(f"  {i}. {n['name']} ({trait}) — {n['territory']} tiles, "
                      f"pop {n['population']:,}, {n['battles_won']}W/{n['battles_lost']}L"
                      f"{ruled}")
@@ -319,6 +341,8 @@ def build_parser():
     sq.add_argument('--events',  action='store_true', help='List all world events')
     sq.add_argument('--from', dest='from_turn', type=int, default=None, metavar='T',
                     help='With default query or --events: only include world events with turn >= T')
+    sq.add_argument('--to', dest='to_turn', type=int, default=None, metavar='U',
+                    help='With default query or --events: only include world events with turn <= U')
 
     # stream
     st = sub.add_parser('stream', parents=[shared],
@@ -326,7 +350,9 @@ def build_parser():
     st.add_argument('--notable', action='store_true',
                     help='Emit only turns with a notable event (see events.is_notable) or a nation death')
     st.add_argument('--from', dest='from_turn', type=int, default=None, metavar='T',
-                    help='Only emit lines for turns >= T (full sim still runs from start)')
+                    help='Only emit lines for turns >= T (full sim still runs)')
+    st.add_argument('--to', dest='to_turn', type=int, default=None, metavar='U',
+                    help='Only emit lines for turns <= U (full sim still runs)')
 
     # summary
     sub.add_parser('summary', parents=[shared],

@@ -123,5 +123,45 @@ class TestNoEvents(unittest.TestCase):
             'Control run (seed 2, 40 turns) produced no events — consider increasing --turns')
 
 
+# ── Turn window: --from / --to ───────────────────────────────────────────────
+
+class TestTurnWindow(unittest.TestCase):
+
+    def test_to_before_from_exits_before_sim(self):
+        """An inverted window is an error and must not start a run."""
+        rc, out, _ = run_cli(
+            'query', '--seed', '1', '--turns', '0', '--events',
+            '--from', '4', '--to', '2',
+        )
+        self.assertNotEqual(rc, 0)
+        data = json.loads(out)
+        self.assertIn('error', data)
+        self.assertIn('--to', data['error'])
+
+    def test_query_events_window_matches_slice(self):
+        """--from/--to on query --events is the inclusive slice of the full log."""
+        rc_full, full, _ = run_cli('query', '--seed', '1', '--turns', '20', '--events')
+        rc_win, window, _ = run_cli(
+            'query', '--seed', '1', '--turns', '20', '--events',
+            '--from', '5', '--to', '12',
+        )
+        self.assertEqual(rc_full, 0)
+        self.assertEqual(rc_win, 0)
+        full_events = json.loads(full)['events']
+        window_events = json.loads(window)['events']
+        self.assertEqual(
+            window_events,
+            [e for e in full_events if 5 <= e['turn'] <= 12],
+        )
+
+    def test_stream_emits_only_turns_inside_window(self):
+        rc, out, err = run_cli(
+            'stream', '--seed', '1', '--turns', '8', '--from', '3', '--to', '5',
+        )
+        self.assertEqual(rc, 0, msg=err)
+        lines = [json.loads(line) for line in out.splitlines() if line.strip()]
+        self.assertEqual([line['turn'] for line in lines], [3, 4, 5])
+
+
 if __name__ == '__main__':
     unittest.main()

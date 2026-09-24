@@ -37,6 +37,7 @@ def nation_dict(n, turn=0):
         'leader_aggression': round(n.leader_aggression, 2),
         'leader_name':       n.leader_name,
         'leader_epithet':    n.leader_epithet(),
+        'leader_chronicle':  n.leader_chronicle_title(),
         'leader_age':        n.leader_age,
         'founding_turn':     n.founding_turn,
         'founding_capital':  n.founding_capital,

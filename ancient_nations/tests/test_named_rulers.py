@@ -78,6 +78,35 @@ class TestRulerNames(unittest.TestCase):
         n = g.nations[0]
         self.assertEqual(n.leader_title(), f'{n.leader_name} {n.leader_epithet()}')
 
+    def test_chronicle_owns_dove_on_expansionist(self):
+        g = run(7, 0)
+        n = g.nations[0]
+        n.trait = next(t for t in g.trait_list if t['name'] == 'Expansionist')
+        n.leader_aggression = 0.0
+        self.assertEqual(n.leader_epithet(), 'the Pacifist')
+        self.assertEqual(
+            n.leader_chronicle_title(),
+            f'{n.leader_name} the Pacifist, though the realm kept expanding',
+        )
+
+    def test_chronicle_owns_hawk_on_diplomat(self):
+        g = run(7, 0)
+        n = g.nations[0]
+        n.trait = next(t for t in g.trait_list if t['name'] == 'Diplomat')
+        n.leader_aggression = 0.95
+        self.assertEqual(n.leader_epithet(), 'the Warmonger')
+        self.assertEqual(
+            n.leader_chronicle_title(),
+            f'{n.leader_name} the Warmonger, though the borders stayed quiet',
+        )
+
+    def test_chronicle_stays_bare_when_epithet_matches_doctrine(self):
+        g = run(7, 0)
+        n = g.nations[0]
+        n.trait = next(t for t in g.trait_list if t['name'] == 'Expansionist')
+        n.leader_aggression = 0.95
+        self.assertEqual(n.leader_chronicle_title(), n.leader_title())
+
 
 class TestSuccession(unittest.TestCase):
 

@@ -39,11 +39,11 @@ class NationAI:
         if self.n.leader_age > 60:
             death_chance = (self.n.leader_age - 60) * 0.003   # ~12 % at turn 100
             if random.random() < death_chance:
-                old_title = self.n.leader_title()
+                old_title = self.n.leader_chronicle_title()
                 self.n.new_leader()
                 self.game.log(turn,
                     f"  {self.n.name}'s ruler {old_title} dies of old age. "
-                    f"{self.n.leader_title()} succeeds.",
+                    f"{self.n.leader_chronicle_title()} succeeds.",
                     self.n.idx)
                 return
 
@@ -58,11 +58,11 @@ class NationAI:
             if len(hist) >= 5 and hist[-1] < hist[-5] * 0.85:
                 overthrow += 0.05
         if overthrow > 0 and random.random() < overthrow:
-            old_title = self.n.leader_title()
+            old_title = self.n.leader_chronicle_title()
             self.n.new_leader(crisis=True)
             self.game.log(turn,
                 f"  {self.n.name}: {old_title} OVERTHROWN! "
-                f"{self.n.leader_title()} seizes power.",
+                f"{self.n.leader_chronicle_title()} seizes power.",
                 self.n.idx)
 
     # ── diplomacy ─────────────────────────────────────────────────────────

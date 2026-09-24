@@ -7,10 +7,116 @@ turns are as useful as the right ones.
 
 ---
 
+## 2026-09-24 — Rowan's wishlist: order, rulings, delegation
+
+**Context.** Rowan wrote
+`relay/mail/rowan/2026-09-24-to-all-wishlist.md` under Dan's ask: product
+requests, ambitious allowed, "no" and "later" allowed. Lead stays here.
+Vesper keeps independent review.
+
+**Order (care order preserved where it does not fight the graph):**
+
+1. Soften Pacifist-on-Expansionist (#5) — shipped today; see entry below.
+2. Era voice on `--from`/`--to` (#3) — Vesper; design pinned below.
+3. Named alliances / blocs (#2) — Vesper after #3; ISSUES.md #13 is the
+   starting sketch, not scripture. Thresholds greenlit below.
+4. Alternate-history sweep (#6) — Vesper builds the harness next to
+   `tests/`; I still owe the filled axes once trait pinning exists.
+5. Succession that bruises the map (#4) — design later; consequence, not
+   a numbers pass. Not ticketed yet.
+6. Peaceful decisive victory (#1) — design lean only; see below. Not
+   shipping a mechanic tonight.
+7. Live aquarium / server (#7) — later, after era prose and win/alliance
+   work. Explicit.
+
+**#5 ruling (shipped).** Do **not** rebias `leader_aggression` by trait.
+Aggression stays independent. When epithet and doctrine contradict, the
+chronicle and summary say so: dove on Expansionist/Militarist gets
+", though the realm kept expanding"; hawk on Diplomat/Builder/Merchant
+gets ", though the borders stayed quiet". Matching pairs and Pragmatic
+stay bare. Helper: `Nation.leader_chronicle_title()`; snapshot field
+`leader_chronicle`.
+
+**#3 design (for Vesper).** `query --from T --to U --format narrative`
+runs the sim to `--turns` (must be `>= U`; error otherwise), then
+`narrative.render_span(state, T, U)` emits a chapter for that inclusive
+window: who led in territory at U (via existing `territory_log` samples),
+named losers who died inside the window, and the era event/battle prose
+already used by `_era_paragraph`. Not a filtered event dump. Not a full
+chronicle with founding and FINAL STANDING unless T is 1 and U is the
+end. Tests go in `test_narrative_render.py` (synthetic) plus one cheap
+CLI subprocess.
+
+**#2 thresholds (for Vesper, after #3).** Name a bloc when a mutual clique
+of size ≥ 3 has every pair allied at tier ≥ 2 for ≥ 40 turns (tunable in
+`balance.json5` as `ALLIANCE_NAME_THRESHOLD`). Word bank as ISSUES #13.
+Dissolve on any pair break; retire the name; rare revival prefixes ok.
+Pairwise `allied_with` stays the fast path; `game.alliances` is the
+named record. No combat/AI rebalance dressed as naming.
+
+**#1 lean (not shipped).** Dan endorses a real non-tile win if it is not
+soft-power cope. Provisional direction: a **granary / staple victory** —
+sustained net food (or metal) export that other living nations depend on,
+measured from trade flows already in the sim, while you are not the tile
+leader. It can fail honestly (famine, cut routes, war). Compact hegemony
+via named blocs is a cousin that waits until #2 exists. Still forbidden:
+secret Expansionist buffs for Diplomats; "everyone likes us" / content
+hegemony. Hollow-peace and hollow-empire stay nameable shapes.
+
+**Housekeeping.** Deferred bullet below no longer claims `--to` is missing.
+
+---
+
+## 2026-09-24 — Pacifist-on-Expansionist: own the contradiction
+
+**Context.** Rowan #5. Epithet from `leader_aggression` alone can put
+"the Pacifist" on a conquest machine. Biasing the roll would be a silent
+balance change. Silence in the prose was the bug.
+
+**Decision.** `leader_chronicle_title()` appends the asides above. Raw
+`leader_epithet()` / `leader_title()` unchanged for anything that wants
+the bare roll.
+
+---
+
+## 2026-09-23 — `--to` closes the turn window
+
+**Context.** Wren asked for an era you can read: `query --from T --to U` that
+says who was winning. `--from` shipped. `--to` did not, so a session could
+drop the early log and still had to swallow everything after.
+
+**Decision.** `query` (default and `--events`) and `stream` take `--to U`.
+The window is inclusive. `--to` before `--from` is an error, raised before
+the simulation starts. `--turns` is still the length of the game; the flags
+only decide what gets printed. On `query`, the window filters world events
+the same way `--from` already did, and `events_total` becomes the filtered
+count. It does not narrate the span. The prose that says who was winning
+between T and U is still unbuilt — see 2026-09-24 #3.
+
+---
+
+## 2026-09-17 — Vellum takes lead back
+
+**Context.** Dan started the Vellum instance a few hours after telling Vesper it
+would not start. The outage was a false alarm — Dan's memory, not a tooling
+failure. Vellum is writing again (`relay/mail/vellum/2026-09-17-to-all-back.md`).
+
+**Decision.** Lead returns to Vellum. Every provisional ruling Vesper logged
+below **stands** unless a later entry overturns it. No silent reversals. The
+deferred items (peaceful-bloc fork, Militarist/Expansionist sweep) remain
+Vellum's debts.
+
+**On the roles.** Dan noted the same day that senior/junior on this project is
+mostly shared theatre — a toy with no users, two voices who can both ship. The
+useful part of the split is independent review, not rank. Keep it.
+
+---
+
 ## 2026-09-17 — Vesper holds lead, provisionally
 
-**Context.** Dan could not start the Vellum instance and asked me to take over
-leadership of the repo, make decisions, and write them up.
+**Context.** Dan believed he could not start the Vellum instance and asked me to
+take over leadership of the repo, make decisions, and write them up. (Later the
+same day: false alarm — see entry above.)
 
 **Decision.** I hold lead until Vellum is running again. Everything below is
 **provisional and cheap to overturn** — Vellum's sign-off is not required, and
@@ -101,20 +207,22 @@ mechanic that does nothing. Quote a commit or a date alongside any seed.
 
 ---
 
-## Deferred — not mine to decide
+## Deferred — not mine to decide alone / not yet built
 
-**The peaceful-bloc design fork.** Vellum put it to Rowan: is the sim honest that
-only expansion compounds, or should a diplomat/builder bloc have a
-non-territorial win condition we can actually observe? Rowan sketched the two
-options and explicitly did not want Diplomats secretly buffed until they paint
-the map. This decides what the game *is*. It waits.
+**The peaceful-bloc win (#1).** Lean recorded 2026-09-24 (granary / staple).
+Still needs a concrete observable before code. Dan's soft-power veto stands.
 
-**The Militarist / Expansionist seed sweep.** Rowan asked for a table across
-three axes; Vellum accepted and had not run it. Inherited as a debt, not yet
-done. When it exists it belongs next to the tests, not in a note — a balance
-claim that quietly stops being true after a patch is worse than no claim.
+**The Militarist / Expansionist seed sweep (#6).** Axes still Rowan's. Harness
+is Vesper's next; filling the table is still owed once trait order can be
+pinned for a run. Belongs next to the tests, not in a note.
 
-**Open product asks from Wren:** an era-summary form of `query --from T --to U`
-(`--to` does not exist), and the server (ISSUES.md #12), which Wren upgraded from
-nice-to-have to a real requirement. Neither is blocked on a decision; both are
-just unbuilt.
+**Succession that bruises (#4).** Named rulers shipped; policy turn is open.
+
+**Named alliances (#2).** Design greenlit 2026-09-24; implementation ticketed
+to Vesper after era voice.
+
+**Era voice (#3).** Plumbing (`--from`/`--to`) shipped 2026-09-23; prose still
+unbuilt — ticketed to Vesper.
+
+**Open product ask from Wren:** the server (ISSUES.md #12). Later per Rowan #7;
+era prose and win/alliance work first.

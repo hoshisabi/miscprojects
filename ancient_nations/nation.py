@@ -15,6 +15,13 @@ _LEADER_EPITHETS = [
     (0.00, 'the Pacifist'),
 ]
 
+# Epithet still derives only from leader_aggression. When that contradicts the
+# nation's trait, the chronicle names the tension instead of rewriting the roll.
+_DOVE_EPITHETS = frozenset({'the Pacifist', 'the Cautious'})
+_HAWK_EPITHETS = frozenset({'the Warmonger', 'the Aggressive', 'the Ambitious'})
+_EXPANDING_TRAITS = frozenset({'Expansionist', 'Militarist'})
+_PEACEFUL_TRAITS = frozenset({'Diplomat', 'Builder', 'Merchant'})
+
 
 class DiplomaticStatus:
     PEACE    = 'peace'
@@ -137,6 +144,22 @@ class Nation:
     def leader_title(self):
         """Name plus epithet, e.g. "Caldarius the Pacifist" — the display form."""
         return f"{self.leader_name} {self.leader_epithet()}"
+
+    def leader_chronicle_title(self):
+        """Title for prose and summary. Owns trait/epithet contradictions aloud.
+
+        Aggression is independent of trait by design; silence was the bug.
+        Dove epithet on an expanding doctrine, or hawk on a peaceful one, gets
+        a short aside. Matching pairs and Pragmatic stay bare.
+        """
+        title = self.leader_title()
+        trait = (self.trait or {}).get('name')
+        epithet = self.leader_epithet()
+        if trait in _EXPANDING_TRAITS and epithet in _DOVE_EPITHETS:
+            return f"{title}, though the realm kept expanding"
+        if trait in _PEACEFUL_TRAITS and epithet in _HAWK_EPITHETS:
+            return f"{title}, though the borders stayed quiet"
+        return title
 
     def new_leader(self, crisis=False):
         """Install a new ruler.  Crisis successions skew toward extremes."""
