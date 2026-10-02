@@ -1,19 +1,12 @@
 # TODO
 
-## Two-pass diarization to fix OOM on long files
+Nothing open.
 
-When `--diarize` is used with long recordings (3+ hours), both the whisper model and pyannote
-pipeline are live in VRAM simultaneously, causing an OOM kill on 12GB cards.
+## Done
 
-Fix: restructure `main()` to materialize whisper segments first, then flush VRAM before diarizing.
-
-```python
-segments_gen, info = transcribe_local(audio_path, args)
-raw_segments = list(segments_gen)   # materialize before diarization
-del model                            # need to expose model ref from transcribe_local
-torch.cuda.empty_cache()
-turns = diarize(audio_path, ...)
-```
-
-`transcribe_local()` will need to return the model object so the caller can del it, or accept a
-callback, or be restructured to not hold the model after transcription completes.
+- **Two-pass diarization to fix OOM on long files.** `--diarize` now runs pyannote in a child
+  process (`diarize_in_subprocess`) that exits before the whisper model loads, so the two models
+  are never in VRAM together.
+- **Native abort (0xC0000409) on long local runs.** Caused by ctranslate2 4.7.1's CUDA sampling
+  path (used by faster-whisper's temperature fallback); fixed by requiring ctranslate2 >= 4.8.2.
+  Local transcription also runs in `--chunk-minutes` slices and writes output line-buffered.
