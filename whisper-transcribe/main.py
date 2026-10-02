@@ -11,9 +11,11 @@ load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 
 
 def detect_device():
+    # Ask ctranslate2 rather than torch, so the transcription process never
+    # loads torch's CUDA libraries alongside ctranslate2's.
     try:
-        import torch
-        if torch.cuda.is_available():
+        import ctranslate2
+        if ctranslate2.get_cuda_device_count() > 0:
             return "cuda"
     except ImportError:
         pass
@@ -204,8 +206,46 @@ def assign_speakers(segments, turns):
     return result
 
 
+SAMPLE_RATE = 16000
+
+
+def find_split_points(samples, sample_rate, chunk_s, search_s=30.0, window_s=0.5):
+    """Return sample offsets at which to cut audio into ~chunk_s slices.
+
+    Each cut lands in the quietest window_s window within +/- search_s of the
+    target, so slices rarely end mid-word. The first offset is always 0.
+    chunk_s <= 0 disables splitting."""
+    import numpy as np
+
+    total = len(samples)
+    chunk = int(chunk_s * sample_rate)
+    if chunk <= 0:
+        return [0]
+    search = min(int(search_s * sample_rate), chunk // 2)
+    window = max(1, int(window_s * sample_rate))
+
+    points = [0]
+    # Stop once the remainder fits in one slice plus the search margin, so the
+    # last slice is never a sliver.
+    while total - points[-1] > chunk + search:
+        center = points[-1] + chunk
+        lo = center - search
+        region = samples[lo:center + search]
+        n = len(region) // window
+        if n == 0:
+            points.append(center)
+            continue
+        frames = np.asarray(region[:n * window], dtype=np.float32).reshape(n, window)
+        quietest = int(np.argmin((frames ** 2).mean(axis=1)))
+        points.append(lo + quietest * window + window // 2)
+    return points
+
+
 def transcribe_local(audio_path, args):
-    from faster_whisper import WhisperModel
+    """Transcribe in slices of args.chunk_minutes. Returns (segments, info), where
+    segments yields (start, end, text) in seconds from the start of the file and
+    info comes from the first slice."""
+    from faster_whisper import WhisperModel, decode_audio
     device = args.device if args.device and args.device != "auto" else detect_device()
     if args.compute_type and args.compute_type != "auto":
         compute_type = args.compute_type
@@ -228,19 +268,39 @@ def transcribe_local(audio_path, args):
         cpu_threads=args.cpu_threads,
         num_workers=2,
     )
-    segments, info = model.transcribe(
-        str(audio_path),
-        beam_size=args.beam_size,
-        vad_filter=True,
-        vad_parameters=dict(
-            threshold=args.vad_threshold,
-            min_silence_duration_ms=args.vad_min_silence_ms,
-            speech_pad_ms=args.vad_speech_pad_ms,
-        ),
-        language=args.language,
-        repetition_penalty=args.repetition_penalty,
-    )
-    return segments, info
+
+    logging.debug("Decoding audio")
+    audio = decode_audio(str(audio_path), sampling_rate=SAMPLE_RATE)
+    points = find_split_points(audio, SAMPLE_RATE, args.chunk_minutes * 60)
+    bounds = list(zip(points, points[1:] + [len(audio)]))
+    logging.debug("Audio is %.1fs, transcribing in %d slice(s)", len(audio) / SAMPLE_RATE, len(bounds))
+
+    def run(start, end):
+        return model.transcribe(
+            audio[start:end],
+            beam_size=args.beam_size,
+            vad_filter=True,
+            vad_parameters=dict(
+                threshold=args.vad_threshold,
+                min_silence_duration_ms=args.vad_min_silence_ms,
+                speech_pad_ms=args.vad_speech_pad_ms,
+            ),
+            language=args.language,
+            repetition_penalty=args.repetition_penalty,
+        )
+
+    first_segments, info = run(*bounds[0])
+
+    def segments():
+        for i, (start, end) in enumerate(bounds):
+            offset = start / SAMPLE_RATE
+            if len(bounds) > 1:
+                logging.debug("Slice %d/%d: %.1fs-%.1fs", i + 1, len(bounds), offset, end / SAMPLE_RATE)
+            slice_segments = first_segments if i == 0 else run(start, end)[0]
+            for seg in slice_segments:
+                yield seg.start + offset, seg.end + offset, seg.text
+
+    return segments(), info
 
 
 def setup_logging(verbose=False, quiet=False):
@@ -362,6 +422,12 @@ Note: Groq preprocessing requires ffmpeg to be installed.
         help="Number of CPU threads for local transcription (default: 12)"
     )
     parser.add_argument(
+        "--chunk-minutes",
+        type=float,
+        default=10,
+        help="Transcribe locally in slices of this many minutes, cut at the quietest point nearby; 0 = whole file at once (default: 10)"
+    )
+    parser.add_argument(
         "--vad-threshold",
         type=float,
         default=0.3,
@@ -443,17 +509,16 @@ Note: Groq preprocessing requires ffmpeg to be installed.
 
             if args.diarize:
                 turns = diarize(audio_path, args.hf_token, num_speakers=args.num_speakers)
-                raw_segments = [(s.start, s.end, s.text) for s in segments_gen]
-                labeled = assign_speakers(raw_segments, turns)
+                labeled = assign_speakers(list(segments_gen), turns)
                 for start, end, speaker, text in labeled:
                     line = "[%s] [%.2fs -> %.2fs] %s" % (speaker, start, end, text)
                     print(line, file=out_file)
                     logging.debug("Segment: %s %.2f -> %.2f: %s", speaker, start, end, text)
             else:
-                for segment in segments_gen:
-                    line = "[%.2fs -> %.2fs] %s" % (segment.start, segment.end, segment.text)
+                for start, end, text in segments_gen:
+                    line = "[%.2fs -> %.2fs] %s" % (start, end, text)
                     print(line, file=out_file)
-                    logging.debug("Segment: %.2f -> %.2f: %s", segment.start, segment.end, segment.text)
+                    logging.debug("Segment: %.2f -> %.2f: %s", start, end, text)
     finally:
         if out_file:
             out_file.close()
