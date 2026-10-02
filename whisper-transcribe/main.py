@@ -12,9 +12,27 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 
 
+def add_torch_cuda_dll_dir():
+    """Let ctranslate2 find the cuBLAS/cuDNN DLLs bundled with torch.
+
+    On Windows, ctranslate2 loads cublas64_12.dll and the cuDNN libraries at
+    runtime from the DLL search path. Up to 4.7 it imported torch as a side
+    effect, which put torch/lib on that path; from 4.8 it no longer does.
+    ctranslate2 4.7.1 aborted (0xC0000409) whenever faster-whisper's
+    temperature fallback used its CUDA sampling path, so 4.8+ is required."""
+    if sys.platform != "win32":
+        return
+    import importlib.util
+    spec = importlib.util.find_spec("torch")
+    if not spec or not spec.submodule_search_locations:
+        return
+    lib_dir = Path(next(iter(spec.submodule_search_locations))) / "lib"
+    if lib_dir.is_dir():
+        os.environ["PATH"] = str(lib_dir) + os.pathsep + os.environ.get("PATH", "")
+
+
 def detect_device():
-    # Ask ctranslate2 rather than torch, so the transcription process never
-    # loads torch's CUDA libraries alongside ctranslate2's.
+    # Ask ctranslate2 rather than torch, to avoid importing torch just for this.
     try:
         import ctranslate2
         if ctranslate2.get_cuda_device_count() > 0:
@@ -196,9 +214,10 @@ def diarize(audio_path, hf_token, num_speakers=None):
 def diarize_in_subprocess(audio_path, hf_token, num_speakers=None, verbose=False):
     """Run diarize() in a child process and return its turns.
 
-    pyannote (torch) and faster-whisper (ctranslate2) each bring their own CUDA
-    libraries; sharing one process crashed natively (0xC0000409) on long files.
-    The child also releases its VRAM before the whisper model loads."""
+    The child exits, releasing pyannote's VRAM, before the whisper model loads,
+    so the two models are never resident together (long files OOMed on 12GB
+    cards that way). A native crash in pyannote also cannot take down the
+    transcription."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         turns_path = Path(tmp_dir) / "turns.json"
         cmd = [sys.executable, str(Path(__file__).resolve()), str(audio_path),
@@ -283,6 +302,7 @@ def transcribe_local(audio_path, args):
     """Transcribe in slices of args.chunk_minutes. Returns (segments, info), where
     segments yields (start, end, text) in seconds from the start of the file and
     info comes from the first slice."""
+    add_torch_cuda_dll_dir()
     from faster_whisper import WhisperModel, decode_audio
     device = args.device if args.device and args.device != "auto" else detect_device()
     if args.compute_type and args.compute_type != "auto":
