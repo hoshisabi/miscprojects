@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import argparse
+import json
 import logging
 import os
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -189,6 +191,42 @@ def diarize(audio_path, hf_token, num_speakers=None):
     ]
     logging.debug("Diarization found %d turns", len(turns))
     return turns
+
+
+def diarize_in_subprocess(audio_path, hf_token, num_speakers=None, verbose=False):
+    """Run diarize() in a child process and return its turns.
+
+    pyannote (torch) and faster-whisper (ctranslate2) each bring their own CUDA
+    libraries; sharing one process crashed natively (0xC0000409) on long files.
+    The child also releases its VRAM before the whisper model loads."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        turns_path = Path(tmp_dir) / "turns.json"
+        cmd = [sys.executable, str(Path(__file__).resolve()), str(audio_path),
+               "--diarize-worker", str(turns_path)]
+        if num_speakers is not None:
+            cmd += ["--num-speakers", str(num_speakers)]
+        if verbose:
+            cmd.append("-v")
+        # Token goes through the environment rather than the command line.
+        env = {**os.environ, "HF_TOKEN": hf_token}
+        logging.debug("Running diarization in a subprocess")
+        proc = subprocess.run(cmd, env=env)
+        if not turns_path.exists():
+            raise RuntimeError("Diarization subprocess exited with code %d and wrote no output" % proc.returncode)
+        if proc.returncode != 0:
+            logging.warning("Diarization subprocess exited with code %d after writing its output; continuing", proc.returncode)
+        with open(turns_path, encoding="utf-8") as f:
+            return [tuple(t) for t in json.load(f)]
+
+
+def run_diarize_worker(args):
+    """Child-process entry point for diarize_in_subprocess."""
+    turns = diarize(Path(args.audio_file), args.hf_token, num_speakers=args.num_speakers)
+    out = Path(args.diarize_worker)
+    partial = out.with_suffix(".partial")
+    with open(partial, "w", encoding="utf-8") as f:
+        json.dump(turns, f)
+    os.replace(partial, out)
 
 
 def assign_speakers(segments, turns):
@@ -446,6 +484,11 @@ Note: Groq preprocessing requires ffmpeg to be installed.
         help="Padding in ms added around detected speech (default: 400)"
     )
     parser.add_argument(
+        "--diarize-worker",
+        metavar="TURNS_JSON",
+        help=argparse.SUPPRESS,  # internal: run diarization only, write turns to this path
+    )
+    parser.add_argument(
         "-v", "--verbose",
         action="store_true",
         help="Enable debug output"
@@ -470,6 +513,10 @@ Note: Groq preprocessing requires ffmpeg to be installed.
     if not audio_path.is_file():
         logging.error("Not a file: %s", args.audio_file)
         sys.exit(1)
+
+    if args.diarize_worker:
+        run_diarize_worker(args)
+        return
 
     out_file = None
     if args.out:
@@ -503,14 +550,22 @@ Note: Groq preprocessing requires ffmpeg to be installed.
                 logging.error("--diarize requires an HF token (--hf-token or HF_TOKEN env var)")
                 sys.exit(1)
 
+            # Diarize first, in its own process, so it never shares a process
+            # or VRAM with the whisper model.
+            turns = None
+            if args.diarize:
+                turns = diarize_in_subprocess(audio_path, args.hf_token,
+                                              num_speakers=args.num_speakers, verbose=args.verbose)
+
             logging.debug("Using local model '%s'", args.model)
             segments_gen, info = transcribe_local(audio_path, args)
             print("Detected language '%s' with probability %.2f" % (info.language, info.language_probability), file=out_file)
 
-            if args.diarize:
-                turns = diarize(audio_path, args.hf_token, num_speakers=args.num_speakers)
-                labeled = assign_speakers(list(segments_gen), turns)
-                for start, end, speaker, text in labeled:
+            if turns is not None:
+                # Turns are already known, so each segment is labeled and
+                # written as soon as it is transcribed.
+                for segment in segments_gen:
+                    start, end, speaker, text = assign_speakers([segment], turns)[0]
                     line = "[%s] [%.2fs -> %.2fs] %s" % (speaker, start, end, text)
                     print(line, file=out_file)
                     logging.debug("Segment: %s %.2f -> %.2f: %s", speaker, start, end, text)
