@@ -521,10 +521,13 @@ Note: Groq preprocessing requires ffmpeg to be installed.
     out_file = None
     if args.out:
         try:
-            out_file = open(args.out, "w", encoding="utf-8")
+            # Line-buffered, so a crash mid-run leaves every finished segment on disk.
+            out_file = open(args.out, "w", encoding="utf-8", buffering=1)
         except IOError as e:
             logging.error("Cannot write to %s: %s", args.out, e)
             sys.exit(1)
+    else:
+        sys.stdout.reconfigure(line_buffering=True)
 
     try:
         if args.groq_key and args.diarize:
@@ -576,6 +579,8 @@ Note: Groq preprocessing requires ffmpeg to be installed.
                     logging.debug("Segment: %.2f -> %.2f: %s", start, end, text)
     finally:
         if out_file:
+            out_file.flush()
+            os.fsync(out_file.fileno())
             out_file.close()
             logging.info("Transcript saved to: %s", args.out)
 
