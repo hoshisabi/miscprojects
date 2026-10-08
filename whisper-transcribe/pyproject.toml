@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "audioop-lts>=0.2.2; python_version >= '3.13'",
+    "ctranslate2>=4.8.2",
     "faster-whisper>=1.2.1",
     "groq>=1.1.1",
     "pyannote.audio>=3.3",
@@ -25,3 +26,8 @@ torch = { index = "pytorch-cuda" }
 name = "pytorch-cuda"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

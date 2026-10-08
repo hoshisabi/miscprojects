@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import argparse
+import json
 import logging
 import os
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -10,10 +12,30 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 
 
+def add_torch_cuda_dll_dir():
+    """Let ctranslate2 find the cuBLAS/cuDNN DLLs bundled with torch.
+
+    On Windows, ctranslate2 loads cublas64_12.dll and the cuDNN libraries at
+    runtime from the DLL search path. Up to 4.7 it imported torch as a side
+    effect, which put torch/lib on that path; from 4.8 it no longer does.
+    ctranslate2 4.7.1 aborted (0xC0000409) whenever faster-whisper's
+    temperature fallback used its CUDA sampling path, so 4.8+ is required."""
+    if sys.platform != "win32":
+        return
+    import importlib.util
+    spec = importlib.util.find_spec("torch")
+    if not spec or not spec.submodule_search_locations:
+        return
+    lib_dir = Path(next(iter(spec.submodule_search_locations))) / "lib"
+    if lib_dir.is_dir():
+        os.environ["PATH"] = str(lib_dir) + os.pathsep + os.environ.get("PATH", "")
+
+
 def detect_device():
+    # Ask ctranslate2 rather than torch, to avoid importing torch just for this.
     try:
-        import torch
-        if torch.cuda.is_available():
+        import ctranslate2
+        if ctranslate2.get_cuda_device_count() > 0:
             return "cuda"
     except ImportError:
         pass
@@ -189,6 +211,43 @@ def diarize(audio_path, hf_token, num_speakers=None):
     return turns
 
 
+def diarize_in_subprocess(audio_path, hf_token, num_speakers=None, verbose=False):
+    """Run diarize() in a child process and return its turns.
+
+    The child exits, releasing pyannote's VRAM, before the whisper model loads,
+    so the two models are never resident together (long files OOMed on 12GB
+    cards that way). A native crash in pyannote also cannot take down the
+    transcription."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        turns_path = Path(tmp_dir) / "turns.json"
+        cmd = [sys.executable, str(Path(__file__).resolve()), str(audio_path),
+               "--diarize-worker", str(turns_path)]
+        if num_speakers is not None:
+            cmd += ["--num-speakers", str(num_speakers)]
+        if verbose:
+            cmd.append("-v")
+        # Token goes through the environment rather than the command line.
+        env = {**os.environ, "HF_TOKEN": hf_token}
+        logging.debug("Running diarization in a subprocess")
+        proc = subprocess.run(cmd, env=env)
+        if not turns_path.exists():
+            raise RuntimeError("Diarization subprocess exited with code %d and wrote no output" % proc.returncode)
+        if proc.returncode != 0:
+            logging.warning("Diarization subprocess exited with code %d after writing its output; continuing", proc.returncode)
+        with open(turns_path, encoding="utf-8") as f:
+            return [tuple(t) for t in json.load(f)]
+
+
+def run_diarize_worker(args):
+    """Child-process entry point for diarize_in_subprocess."""
+    turns = diarize(Path(args.audio_file), args.hf_token, num_speakers=args.num_speakers)
+    out = Path(args.diarize_worker)
+    partial = out.with_suffix(".partial")
+    with open(partial, "w", encoding="utf-8") as f:
+        json.dump(turns, f)
+    os.replace(partial, out)
+
+
 def assign_speakers(segments, turns):
     """Map each (start, end, text) segment to the speaker with the most overlap."""
     result = []
@@ -204,8 +263,47 @@ def assign_speakers(segments, turns):
     return result
 
 
+SAMPLE_RATE = 16000
+
+
+def find_split_points(samples, sample_rate, chunk_s, search_s=30.0, window_s=0.5):
+    """Return sample offsets at which to cut audio into ~chunk_s slices.
+
+    Each cut lands in the quietest window_s window within +/- search_s of the
+    target, so slices rarely end mid-word. The first offset is always 0.
+    chunk_s <= 0 disables splitting."""
+    import numpy as np
+
+    total = len(samples)
+    chunk = int(chunk_s * sample_rate)
+    if chunk <= 0:
+        return [0]
+    search = min(int(search_s * sample_rate), chunk // 2)
+    window = max(1, int(window_s * sample_rate))
+
+    points = [0]
+    # Stop once the remainder fits in one slice plus the search margin, so the
+    # last slice is never a sliver.
+    while total - points[-1] > chunk + search:
+        center = points[-1] + chunk
+        lo = center - search
+        region = samples[lo:center + search]
+        n = len(region) // window
+        if n == 0:
+            points.append(center)
+            continue
+        frames = np.asarray(region[:n * window], dtype=np.float32).reshape(n, window)
+        quietest = int(np.argmin((frames ** 2).mean(axis=1)))
+        points.append(lo + quietest * window + window // 2)
+    return points
+
+
 def transcribe_local(audio_path, args):
-    from faster_whisper import WhisperModel
+    """Transcribe in slices of args.chunk_minutes. Returns (segments, info), where
+    segments yields (start, end, text) in seconds from the start of the file and
+    info comes from the first slice."""
+    add_torch_cuda_dll_dir()
+    from faster_whisper import WhisperModel, decode_audio
     device = args.device if args.device and args.device != "auto" else detect_device()
     if args.compute_type and args.compute_type != "auto":
         compute_type = args.compute_type
@@ -228,19 +326,39 @@ def transcribe_local(audio_path, args):
         cpu_threads=args.cpu_threads,
         num_workers=2,
     )
-    segments, info = model.transcribe(
-        str(audio_path),
-        beam_size=args.beam_size,
-        vad_filter=True,
-        vad_parameters=dict(
-            threshold=args.vad_threshold,
-            min_silence_duration_ms=args.vad_min_silence_ms,
-            speech_pad_ms=args.vad_speech_pad_ms,
-        ),
-        language=args.language,
-        repetition_penalty=args.repetition_penalty,
-    )
-    return segments, info
+
+    logging.debug("Decoding audio")
+    audio = decode_audio(str(audio_path), sampling_rate=SAMPLE_RATE)
+    points = find_split_points(audio, SAMPLE_RATE, args.chunk_minutes * 60)
+    bounds = list(zip(points, points[1:] + [len(audio)]))
+    logging.debug("Audio is %.1fs, transcribing in %d slice(s)", len(audio) / SAMPLE_RATE, len(bounds))
+
+    def run(start, end):
+        return model.transcribe(
+            audio[start:end],
+            beam_size=args.beam_size,
+            vad_filter=True,
+            vad_parameters=dict(
+                threshold=args.vad_threshold,
+                min_silence_duration_ms=args.vad_min_silence_ms,
+                speech_pad_ms=args.vad_speech_pad_ms,
+            ),
+            language=args.language,
+            repetition_penalty=args.repetition_penalty,
+        )
+
+    first_segments, info = run(*bounds[0])
+
+    def segments():
+        for i, (start, end) in enumerate(bounds):
+            offset = start / SAMPLE_RATE
+            if len(bounds) > 1:
+                logging.debug("Slice %d/%d: %.1fs-%.1fs", i + 1, len(bounds), offset, end / SAMPLE_RATE)
+            slice_segments = first_segments if i == 0 else run(start, end)[0]
+            for seg in slice_segments:
+                yield seg.start + offset, seg.end + offset, seg.text
+
+    return segments(), info
 
 
 def setup_logging(verbose=False, quiet=False):
@@ -362,6 +480,12 @@ Note: Groq preprocessing requires ffmpeg to be installed.
         help="Number of CPU threads for local transcription (default: 12)"
     )
     parser.add_argument(
+        "--chunk-minutes",
+        type=float,
+        default=10,
+        help="Transcribe locally in slices of this many minutes, cut at the quietest point nearby; 0 = whole file at once (default: 10)"
+    )
+    parser.add_argument(
         "--vad-threshold",
         type=float,
         default=0.3,
@@ -378,6 +502,11 @@ Note: Groq preprocessing requires ffmpeg to be installed.
         type=int,
         default=400,
         help="Padding in ms added around detected speech (default: 400)"
+    )
+    parser.add_argument(
+        "--diarize-worker",
+        metavar="TURNS_JSON",
+        help=argparse.SUPPRESS,  # internal: run diarization only, write turns to this path
     )
     parser.add_argument(
         "-v", "--verbose",
@@ -405,13 +534,20 @@ Note: Groq preprocessing requires ffmpeg to be installed.
         logging.error("Not a file: %s", args.audio_file)
         sys.exit(1)
 
+    if args.diarize_worker:
+        run_diarize_worker(args)
+        return
+
     out_file = None
     if args.out:
         try:
-            out_file = open(args.out, "w", encoding="utf-8")
+            # Line-buffered, so a crash mid-run leaves every finished segment on disk.
+            out_file = open(args.out, "w", encoding="utf-8", buffering=1)
         except IOError as e:
             logging.error("Cannot write to %s: %s", args.out, e)
             sys.exit(1)
+    else:
+        sys.stdout.reconfigure(line_buffering=True)
 
     try:
         if args.groq_key and args.diarize:
@@ -437,25 +573,34 @@ Note: Groq preprocessing requires ffmpeg to be installed.
                 logging.error("--diarize requires an HF token (--hf-token or HF_TOKEN env var)")
                 sys.exit(1)
 
+            # Diarize first, in its own process, so it never shares a process
+            # or VRAM with the whisper model.
+            turns = None
+            if args.diarize:
+                turns = diarize_in_subprocess(audio_path, args.hf_token,
+                                              num_speakers=args.num_speakers, verbose=args.verbose)
+
             logging.debug("Using local model '%s'", args.model)
             segments_gen, info = transcribe_local(audio_path, args)
             print("Detected language '%s' with probability %.2f" % (info.language, info.language_probability), file=out_file)
 
-            if args.diarize:
-                turns = diarize(audio_path, args.hf_token, num_speakers=args.num_speakers)
-                raw_segments = [(s.start, s.end, s.text) for s in segments_gen]
-                labeled = assign_speakers(raw_segments, turns)
-                for start, end, speaker, text in labeled:
+            if turns is not None:
+                # Turns are already known, so each segment is labeled and
+                # written as soon as it is transcribed.
+                for segment in segments_gen:
+                    start, end, speaker, text = assign_speakers([segment], turns)[0]
                     line = "[%s] [%.2fs -> %.2fs] %s" % (speaker, start, end, text)
                     print(line, file=out_file)
                     logging.debug("Segment: %s %.2f -> %.2f: %s", speaker, start, end, text)
             else:
-                for segment in segments_gen:
-                    line = "[%.2fs -> %.2fs] %s" % (segment.start, segment.end, segment.text)
+                for start, end, text in segments_gen:
+                    line = "[%.2fs -> %.2fs] %s" % (start, end, text)
                     print(line, file=out_file)
-                    logging.debug("Segment: %.2f -> %.2f: %s", segment.start, segment.end, segment.text)
+                    logging.debug("Segment: %.2f -> %.2f: %s", start, end, text)
     finally:
         if out_file:
+            out_file.flush()
+            os.fsync(out_file.fileno())
             out_file.close()
             logging.info("Transcript saved to: %s", args.out)
 
