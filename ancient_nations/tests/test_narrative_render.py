@@ -187,3 +187,19 @@ class TestTerritoryLookup(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestPopulationIsReadable(unittest.TestCase):
+    """ISSUES #8: raw counts reach tens of millions and stop meaning anything."""
+
+    def test_scales(self):
+        self.assertEqual(narrative.approx_pop(812), '812')
+        self.assertEqual(narrative.approx_pop(127_400), '127k')
+        self.assertEqual(narrative.approx_pop(40_230_000), '40.2 million')
+
+    def test_plague_deaths_use_the_same_scale(self):
+        out = narrative.render(state(
+            [nation('Aegia', 'Militarist'), nation('Borum', 'Builder')],
+            events=[event('plague', pop_lost=2_500_000, armies_weakened=3)]))
+        self.assertIn('killing 2.5 million', out)
+        self.assertNotIn('2500000', out)

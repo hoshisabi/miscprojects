@@ -32,6 +32,7 @@ from engine import GameSession
 from constants import *
 from snapshot import army_dict, battle_dict, nation_dict, tile_dict
 from events import is_notable
+from narrative import approx_pop
 
 
 # ── Session helper ────────────────────────────────────────────────────────────
@@ -267,7 +268,7 @@ def cmd_summary(args):
         )
         ruled = f", ruled by {chronicle}" if chronicle else ''
         lines.append(f"  {i}. {n['name']} ({trait}) — {n['territory']} tiles, "
-                     f"pop {n['population']:,}, {n['battles_won']}W/{n['battles_lost']}L"
+                     f"pop {approx_pop(n['population'])}, {n['battles_won']}W/{n['battles_lost']}L"
                      f"{ruled}")
     for n in dead:
         dt = n.get('death_turn')

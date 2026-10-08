@@ -120,6 +120,11 @@ Even a soft mechanic (alliance stress, reputational cost, or a timer that breaks
 alliance) would add tension.~~
 
 ### 8. Population numbers become very large and lose meaning
+**Display fixed (2026-10):** `narrative.approx_pop` (812 / 127k / 40.2 million) is now
+public and shared by `cli.py summary` standings and the plague sentence, so every
+human-readable output uses one scale. JSON keeps raw integers. The soft per-tile ceiling
+is a balance change and stays open for design.
+
 By turn 1000, Phoenicia had 40 million people on a 100×100 tile map. The numbers are internally
 consistent but stop being legible as flavour — it becomes hard to compare nations or care about
 population as a resource. Might be worth a display-scaling factor (show in thousands/millions in

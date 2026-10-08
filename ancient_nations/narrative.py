@@ -38,7 +38,9 @@ def _article(word: str) -> str:
     return 'an' if first and first in 'aeiou' else 'a'
 
 
-def _approx_pop(n: int) -> str:
+def approx_pop(n: int) -> str:
+    """Population as people read it: 812, 127k, 40.2 million. Shared with
+    `cli.py summary` so the chronicle and the standings agree."""
     if n >= 1_000_000:
         return f"{n/1_000_000:.1f} million"
     if n >= 1_000:
@@ -314,7 +316,7 @@ def _describe_era_events(era_events: list) -> str:
         ),
         'plague':       lambda e: (
             f"Plague swept through the region near {tuple(e['location'])}"
-            + (f", killing {e['effects']['pop_lost']} and weakening {e['effects']['armies_weakened']} armies"
+            + (f", killing {approx_pop(e['effects']['pop_lost'])} and weakening {e['effects']['armies_weakened']} armies"
                if e['effects'].get('pop_lost', 0) > 0 else ", though it passed without great loss") + "."
         ),
         'drought':      lambda e: (
@@ -457,7 +459,7 @@ def _closing(state: dict, battles: list) -> str:
         lines.append(
             f"  {_ordinal(rank)}: {n['name']}"
             f" — {n['territory']} tiles, "
-            f"population {_approx_pop(n['population'])}"
+            f"population {approx_pop(n['population'])}"
             + (f", at war with {_list_names(n['wars_with'])}" if n['wars_with'] else "")
             + "."
         )
@@ -489,7 +491,7 @@ def _closing(state: dict, battles: list) -> str:
     most_pop = max(nations, key=lambda n: n['population'])
     records.append(
         f"{most_pop['name']} built the largest population: "
-        f"{_approx_pop(most_pop['population'])}."
+        f"{approx_pop(most_pop['population'])}."
     )
 
     most_terr = max(nations, key=lambda n: n['territory'])
