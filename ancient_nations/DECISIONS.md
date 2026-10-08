@@ -7,6 +7,20 @@ turns are as useful as the right ones.
 
 ---
 
+## 2026-10-08 — Land of a nation with no towns or armies goes neutral
+
+**Context.** ISSUES #2. Of the three death paths, surrender and union give
+every tile to the winner. `_check_eliminations` has no winner and left the
+tiles owned by the dead slot in the grid.
+
+**Decision.** Release them to neutral through the same reset neglect uses
+(`_release_tile`), with no per-tile log line. Neutral rather than split among
+neighbours: no one won that land, and neutral needs no new rule about who
+borders what. This changes outcomes from the first such death onward in any
+seed where it fires; tests that derive facts are unaffected.
+
+---
+
 ## 2026-09-24 — Rowan's wishlist: order, rulings, delegation
 
 **Context.** Rowan wrote

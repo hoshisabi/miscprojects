@@ -42,10 +42,17 @@ Either aggregate from armies when serialising, or increment `n.history['battles_
 `combat.py` alongside the army increment.~~
 
 ### 2. Dead nations persist visibly in stream output
-After a nation dies, every subsequent NDJSON line still carries its entry with
+**Fixed (2026-10):** `_check_eliminations` (no towns and no armies) now releases the
+remaining tiles to neutral; surrender and union already handed them to the winner. The
+stream had masked this since `turn_summary` zeroes dead rows, but the grid still listed
+the dead slot as owner (46–249 tiles in 6 of 7 seeds checked), neglect skipped dead
+nations so the land stayed frozen, and a revived rebel slot inherited those tiles as
+ghosts missing from its own `tiles`. `tests/test_elimination_tiles.py` covers it.
+
+~~After a nation dies, every subsequent NDJSON line still carries its entry with
 `alive: false, territory: N` (often a slowly-shrinking positive number as remaining tiles get
 absorbed). By turn 700, dead Romanus still showed `territory: 2`. Minor, but adds noise and
-implies the "dead" state is leaky — tiles should fully transfer on death.
+implies the "dead" state is leaky — tiles should fully transfer on death.~~
 
 ### 3. Civil-war rebel nation inherits dead nation's name without disambiguation
 At some point between turn 700 and 1000, a civil-war event fired:

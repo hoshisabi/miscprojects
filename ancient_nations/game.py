@@ -257,7 +257,7 @@ class Game:
                 if tile.territory_neglect >= TERRITORY_NEGLECT_ABANDON_TURNS:
                     self._abandon_tile_to_neutral(n, tile, t)
 
-    def _abandon_tile_to_neutral(self, nation, tile, t):
+    def _release_tile(self, nation, tile):
         nation.tiles.discard((tile.x, tile.y))
         tile.owner = -1
         tile.territory_neglect = 0
@@ -265,6 +265,9 @@ class Game:
         if tile.town is None and tile.entity is not None:
             tile.entity = None
         tile.road = False
+
+    def _abandon_tile_to_neutral(self, nation, tile, t):
+        self._release_tile(nation, tile)
         self.log(t,
             f"  {nation.name} lost control of distant land ({tile.x},{tile.y})",
             nation.idx)
@@ -297,6 +300,9 @@ class Game:
         for n in self.nations:
             if not n.alive: continue
             if len(n.tiles) == 0 or (not n.towns and not n.armies):
+                # No winner to inherit the land, so it goes neutral (ISSUES #2).
+                for xy in list(n.tiles):
+                    self._release_tile(n, self.world.t(xy[0], xy[1]))
                 n.alive      = False
                 n.death_turn = t
                 self._clear_diplomacy(n)
