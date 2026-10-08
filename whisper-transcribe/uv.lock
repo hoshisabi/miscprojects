@@ -2848,6 +2848,7 @@ dependencies = [
     { name = "groq" },
     { name = "pyannote-audio" },
     { name = "pydub" },
+    { name = "pygments" },
     { name = "python-dotenv" },
     { name = "torch" },
 ]
@@ -2859,6 +2860,7 @@ requires-dist = [
     { name = "groq", specifier = ">=1.1.1" },
     { name = "pyannote-audio", specifier = ">=3.3" },
     { name = "pydub", specifier = ">=0.25.1" },
+    { name = "pygments", specifier = ">=2.19.2" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "torch", specifier = "==2.11.0+cu128", index = "https://download.pytorch.org/whl/cu128" },
 ]
