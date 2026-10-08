@@ -64,6 +64,12 @@ the t1000 Romanus has nothing to do with the original one.
 Suggestion: append a suffix (e.g. `Romanus II`) or a `generation` field in the nation dict to
 distinguish lineages.
 
+**Fixed (confirmed 2026-10):** `NationNameGenerator` keeps one registry for the whole game,
+and `spawn_rebel_nation` draws a fresh name from it, so a revived slot never reuses a name.
+21 revivals across seeds 1–10 over 800 turns, no repeats. The rebellion event's `parent`
+effect names the lineage. `test_named_rulers.py::test_a_revived_slot_gets_a_name_never_used_before`
+guards it.
+
 **Partial mitigation (2026-04):** JSON now includes **`slot_revivals`** per nation (increments when a dead slot is revived as a rebel). Same name on the same slot index is still confusing in prose logs; the field helps agents line up NDJSON snapshots.
 
 ---

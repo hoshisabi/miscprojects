@@ -69,9 +69,10 @@ class TestRulerNames(unittest.TestCase):
         g = find_game_with(lambda g: any(n.slot_revivals for n in g.nations),
                            turns=500, max_seeds=4)
         seen = g._namegen._used_names
-        self.assertEqual(len(seen), len(set(seen)))
-        for n in g.nations:
-            self.assertIn(n.leader_name, seen)
+        current = [n.name for n in g.nations] + [n.leader_name for n in g.nations]
+        self.assertEqual(len(current), len(set(current)))
+        for name in current:
+            self.assertIn(name, seen)
 
     def test_title_is_name_plus_epithet(self):
         g = run(7, 0)
@@ -144,6 +145,22 @@ class TestSuccession(unittest.TestCase):
         self.assertIs(rebel, victim, 'the freed slot should have been reused')
         self.assertTrue(rebel.leader_name)
         self.assertNotEqual(rebel.leader_name, stale_ruler)
+
+    def test_a_revived_slot_gets_a_name_never_used_before(self):
+        """ISSUES #3: a rebel on a dead slot read as a resurrection when it
+        reused the old name. Same hand-freed slot as above."""
+        g = run(7, 60)
+        victim = g.nations[0]
+        victim.alive = False
+        g._clear_diplomacy(victim)
+        used_before = set(g._namegen._used_names)
+
+        parent = max((n for n in g.nations if n.alive), key=lambda n: len(n.tiles))
+        rebel = g.spawn_rebel_nation(61, parent)
+
+        self.assertIs(rebel, victim, 'the freed slot should have been reused')
+        self.assertNotIn(rebel.name, used_before)
+        self.assertEqual(rebel.slot_revivals, 1)
 
 
 class TestAssassinationNamesTheRuler(unittest.TestCase):
