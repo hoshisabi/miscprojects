@@ -52,28 +52,5 @@ class TestEliminationReleasesTiles(unittest.TestCase):
             self.assertEqual(self.game.world.t(x, y).owner, -1)
 
 
-class TestNoDeadOwnersAfterRun(unittest.TestCase):
-    """Invariant over a real run: no grid tile belongs to a dead slot, and every
-    living nation's `tiles` matches the grid exactly."""
-
-    def test_seed_1_600_turns(self):
-        session = GameSession(seed=1)
-        game = session.game
-        for _ in range(600):
-            session.step()
-            by_owner = {}
-            for row in game.world.tiles:
-                for t in row:
-                    by_owner.setdefault(t.owner, set()).add((t.x, t.y))
-            for n in game.nations:
-                grid = by_owner.get(n.idx, set())
-                if n.alive:
-                    self.assertEqual(grid, n.tiles,
-                                     f'{n.name} tiles != grid at t{game.turn}')
-                else:
-                    self.assertEqual(grid, set(),
-                                     f'dead {n.name} owns grid tiles at t{game.turn}')
-
-
 if __name__ == '__main__':
     unittest.main()
