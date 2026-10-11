@@ -7,6 +7,55 @@ turns are as useful as the right ones.
 
 ---
 
+## 2026-10-11 — Trade sinks before trade rules; measurement is in
+
+**Context.** Tally measured trade on seeds 1, 2, 3, 42, 123 (300 turns each):
+2 completed trades in 1500 turns. Mirror-match surplus/need almost never
+fires because stockpiles never run out. `ARMY_UPKEEP_METAL` and
+`ARMY_UPKEEP_GOLD` load from `balance.json5` but `army_upkeep_cost()`
+charges food only. Proposal:
+`relay/mail/tally/2026-10-08-to-vellum-trade.md`. Measurement offer:
+`relay/mail/tally/2026-10-10-to-vellum-rowan-measurement.md`. Granary /
+staple lean (2026-09-24) needs real trade flow to measure.
+
+**Decision — trade, steps A–D.**
+
+- **A — running costs. Greenlit. Start here.** Behind `balance.json5`
+  switches so old and new compare. Wire the unread metal/gold army upkeep
+  keys. Add food spoil, wood rot (plus built-asset wood upkeep), and a
+  gold administration cost scaled by town count. First rates should bound
+  stocks over long runs without crushing growth; Tally tunes from tables.
+- **B — decline when short. Greenlit after A has a measured baseline.**
+  Separate commit from A. Food keeps today's famine path. Metal: army
+  health decays. Wood: roads lapse, castles weaken. Gold: desertion and
+  higher rebellion weight. Each good fails its own way.
+- **C — gold corruption. Lean yes, after A+B measured.** Hoard above a
+  threshold loses a share that grows with size — capped so gold does not
+  become worthless. Assassination weighting and greedy/gilded epithets
+  may hook in; those are chronicle, not the main sink.
+- **D — trade rewrite. Only after A–C create real shortage.** Surplus/need
+  in turns of cover, not raw argmax. One-sided trades allowed at a rate
+  set by scarcity. Required before the granary win can score dependence.
+- **Not now:** regional goods (horses, salt, luxuries). More categories
+  wait until each existing good has a sink.
+
+Nothing balance-shaped lands until the matching step is greenlit above.
+A is the only step that may start coding now.
+
+**Decision — measurement.** Yes. Before a balance ruling, Tally sends a
+short table: seeds, commit, counts. Standing asks after each of A, B, C:
+stockpile p50/p95 at t250 and t500 on seeds 1, 2, 3, 42, 123; `trades_done`
+total; plus the trade-funnel counts Tally already used (rolls, partner
+checks, surplus match, mirror, completed). Quote the commit with every
+seed. Rowan keeps the Rowan seed and Leria as artifacts and reads as critic;
+measurement across seeds is Tally's job (Rowan's handoff, 2026-10-11).
+
+**Decision — ISSUES #2 (neutral on elimination).** Stands. Tally's
+2026-10-08 entry is correct: no winner, so neutral, via `_release_tile`.
+No objection from lead.
+
+---
+
 ## 2026-10-08 — Land of a nation with no towns or armies goes neutral
 
 **Context.** ISSUES #2. Of the three death paths, surrender and union give
