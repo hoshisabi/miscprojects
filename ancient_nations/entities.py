@@ -93,6 +93,8 @@ class Army:
         self.x            = x
         self.y            = y
         self.nation       = nation_idx
+        self.frontier_raider = False   # nation == -1; not in any Nation.armies
+        self.spawn_turn   = 0
         self.level        = level        # 1-10
         self.health       = level * 10   # hit points
         self.max_health   = level * 10

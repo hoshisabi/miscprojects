@@ -152,6 +152,9 @@ class Game:
         # 3b. Territory far from any town slowly reverts to neutral (carrying cost)
         self._tick_territory_abandonment(t)
 
+        # 3c. Neutral vacancy + optional frontier raiders (default off)
+        self._tick_frontier_system(t)
+
         # 4. Pay upkeep
         for n in self.nations:
             if not n.alive: continue
@@ -265,12 +268,154 @@ class Game:
         if tile.town is None and tile.entity is not None:
             tile.entity = None
         tile.road = False
+        tile.neutral_vacant_turns = 0
 
     def _abandon_tile_to_neutral(self, nation, tile, t):
         self._release_tile(nation, tile)
         self.log(t,
             f"  {nation.name} lost control of distant land ({tile.x},{tile.y})",
             nation.idx)
+
+    # ── frontier reclaim (Phase 1: raider incursions) ─────────────────────
+    def _tick_frontier_system(self, t):
+        self._tick_neutral_vacancy()
+        if not FRONTIER_RECLAIM_ENABLED:
+            return
+        self._tick_frontier_spawns(t)
+        self._tick_frontier_raider_ttl(t)
+        self._tick_frontier_raider_ai(t)
+
+    def _tick_neutral_vacancy(self):
+        for row in self.world.tiles:
+            for tile in row:
+                if tile.owner == -1 and tile.is_land():
+                    tile.neutral_vacant_turns += 1
+
+    def _frontier_raider_count(self):
+        n = 0
+        for row in self.world.tiles:
+            for tile in row:
+                for a in tile.armies:
+                    if a.is_alive() and a.frontier_raider:
+                        n += 1
+        return n
+
+    def _iter_frontier_raiders(self):
+        for row in self.world.tiles:
+            for tile in row:
+                for a in tile.armies:
+                    if a.is_alive() and a.frontier_raider:
+                        yield a, tile
+
+    def _neutral_adjacent_to_living_nation(self, tile):
+        for nb in self.world.neighbors8(tile.x, tile.y):
+            if nb.owner >= 0 and self.nations[nb.owner].alive:
+                return True
+        return False
+
+    def _tick_frontier_spawns(self, t):
+        if self._frontier_raider_count() >= FRONTIER_MAX_RAIDERS:
+            return
+        for row in self.world.tiles:
+            for tile in row:
+                if self._frontier_raider_count() >= FRONTIER_MAX_RAIDERS:
+                    return
+                if tile.owner != -1 or not tile.is_land():
+                    continue
+                if tile.neutral_vacant_turns < FRONTIER_NEUTRAL_TURNS:
+                    continue
+                if not self._neutral_adjacent_to_living_nation(tile):
+                    continue
+                if any(a.frontier_raider for a in tile.armies):
+                    continue
+                if random.random() >= FRONTIER_SPAWN_CHANCE:
+                    continue
+                self._spawn_frontier_raider(tile, t)
+
+    def _spawn_frontier_raider(self, tile, t):
+        army = Army(tile.x, tile.y, -1, level=FRONTIER_RAIDER_LEVEL)
+        army.frontier_raider = True
+        army.spawn_turn = t
+        army.order = 'attack'
+        tile.armies.append(army)
+        tile.army = army
+        self.log(t, f"Frontier raiders emerge near ({tile.x},{tile.y}).", -1)
+
+    def _remove_frontier_raider(self, army):
+        t = self.world.t(army.x, army.y)
+        if army in t.armies:
+            t.armies.remove(army)
+        if t.army is army:
+            t.army = t.armies[0] if t.armies else None
+
+    def _tick_frontier_raider_ttl(self, t):
+        for army, _tile in list(self._iter_frontier_raiders()):
+            if t - army.spawn_turn >= FRONTIER_RAIDER_MAX_TTL:
+                self._remove_frontier_raider(army)
+
+    def _tick_frontier_raider_ai(self, t):
+        for army, tile in list(self._iter_frontier_raiders()):
+            target_army, target_tile = self._pick_raider_target(army)
+            if target_army and target_tile:
+                self._resolve_raider_vs_nation(army, target_army, target_tile, t)
+            elif target_tile:
+                self._step_raider(army, target_tile.x, target_tile.y)
+
+    def _pick_raider_target(self, raider):
+        """Adjacent nation army (weakest) or adjacent nation-owned land to step onto."""
+        cx, cy = raider.x, raider.y
+        enemies = []
+        move_tiles = []
+        for nb in self.world.neighbors8(cx, cy):
+            if not nb.is_land():
+                continue
+            for a in nb.armies:
+                if a.is_alive() and a.nation >= 0:
+                    enemies.append((a.strength, a, nb))
+            if nb.owner >= 0 and self.nations[nb.owner].alive:
+                move_tiles.append(nb)
+        if enemies:
+            enemies.sort(key=lambda x: x[0])
+            _s, army, tile = enemies[0]
+            return army, tile
+        if move_tiles:
+            return None, random.choice(move_tiles)
+        return None, None
+
+    def _step_raider(self, army, nx, ny):
+        old = self.world.t(army.x, army.y)
+        if army in old.armies:
+            old.armies.remove(army)
+        if old.army is army:
+            old.army = old.armies[0] if old.armies else None
+        army.x, army.y = nx, ny
+        nt = self.world.t(nx, ny)
+        nt.armies.append(army)
+        nt.army = army
+
+    def _resolve_raider_vs_nation(self, raider, defender, tile, t):
+        def_nation = self.nations[defender.nation]
+        def_trait = def_nation.trait_val('def_dice_bonus', 0)
+        if tile.entity == 'castle':
+            def_trait += def_nation.trait_val('castle_def_bonus', 0)
+        winner, battle = self.combat.resolve(
+            raider, defender, tile, t,
+            def_trait_dice=def_trait,
+        )
+        self.battles.append(battle)
+        dn = def_nation.name
+        wname = 'Frontier raiders' if winner < 0 else dn
+        self.log(t,
+            f"[RAID] Battle at ({tile.x},{tile.y}): Frontier raiders vs {dn} > "
+            f"{'WIN' if winner < 0 else 'LOSS'} ({wname})",
+            -1)
+        if not defender.is_alive():
+            self.ai[defender.nation]._remove_army(defender, def_nation)
+        if not raider.is_alive():
+            self._remove_frontier_raider(raider)
+        elif winner >= 0 and raider.is_alive():
+            # Repelled — stay on tile
+            pass
 
     def _tick_famine_towns(self, t):
         """National food stress causes towns to lose levels over time."""

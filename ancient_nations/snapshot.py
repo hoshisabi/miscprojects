@@ -59,9 +59,13 @@ def town_dict(t):
 
 
 def army_dict(a, nation_names):
+    if a.nation < 0 or getattr(a, 'frontier_raider', False):
+        nname = 'Frontier'
+    else:
+        nname = nation_names[a.nation]
     return {
         'id':       a.id,
-        'nation':   nation_names[a.nation],
+        'nation':   nname,
         'x':        a.x,
         'y':        a.y,
         'level':    a.level,

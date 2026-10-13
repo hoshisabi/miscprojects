@@ -95,6 +95,14 @@
   // Rebellion cooldown for the absorbed nation (longer than surrender — it was willing)
   "UNION_COOLDOWN_TURNS":  80,
 
+  // ── Frontier reclaim (Phase 1: raider incursions on long-vacant rim neutrals) ─
+  "FRONTIER_RECLAIM_ENABLED": false,
+  "FRONTIER_NEUTRAL_TURNS": 28,
+  "FRONTIER_SPAWN_CHANCE": 0.003,
+  "FRONTIER_RAIDER_LEVEL": 2,
+  "FRONTIER_RAIDER_MAX_TTL": 40,
+  "FRONTIER_MAX_RAIDERS": 12,
+
   // ── Territory integrity (Vesper/Wren: overextension / Scythia arc) ────────────
   // Tiles not within any friendly town gathering radius accumulate neglect; then revert to neutral.
   "TERRITORY_NEGLECT_ABANDON_TURNS": 14,

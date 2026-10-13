@@ -516,6 +516,8 @@ class NationAI:
             score += d[needed] * 3
             for r in range(NUM_RESOURCES):
                 score += d[r]
+            if any(getattr(a, 'frontier_raider', False) for a in t.armies):
+                score += 500
             # Penalise distance (Manhattan — no sqrt needed for relative scoring)
             dist = abs(t.x - cx) + abs(t.y - cy)
             score /= (dist + 1)
@@ -562,36 +564,49 @@ class NationAI:
         if enemy_armies:
             enemy = enemy_armies[0]
             atk_surge = self.n.army_surge_turns > 0
-            # Tier-4 joint-command: check if defender has a Tier-4 ally also at war
-            def_nation = self.game.nations[enemy.nation]
-            tier4_def = any(
-                def_nation.allied_with(a.idx)
-                and def_nation.alliance_tier(a.idx) >= 4
-                and a.at_war_with(self.n.idx)
-                for a in self.game.nations
-                if a.alive and a.idx != def_nation.idx
-            )
+            raider_def = enemy.nation < 0 or getattr(enemy, 'frontier_raider', False)
+            if raider_def:
+                def_nation = None
+                tier4_def = False
+                def_trait_dice = 0
+            else:
+                # Tier-4 joint-command: check if defender has a Tier-4 ally also at war
+                def_nation = self.game.nations[enemy.nation]
+                tier4_def = any(
+                    def_nation.allied_with(a.idx)
+                    and def_nation.alliance_tier(a.idx) >= 4
+                    and a.at_war_with(self.n.idx)
+                    for a in self.game.nations
+                    if a.alive and a.idx != def_nation.idx
+                )
+                def_trait_dice = def_nation.trait_val('def_dice_bonus', 0)
+                if target_t.entity == 'castle':
+                    def_trait_dice += def_nation.trait_val('castle_def_bonus', 0)
             # Trait-based dice bonuses
             atk_trait_dice = self.n.trait_val('atk_dice_bonus', 0)
-            def_trait_dice = def_nation.trait_val('def_dice_bonus', 0)
-            if target_t.entity == 'castle':
-                def_trait_dice += def_nation.trait_val('castle_def_bonus', 0)
             winner, battle = self.game.combat.resolve(
                 army, enemy, target_t, turn,
                 atk_surge=atk_surge, tier4_def=tier4_def,
                 atk_trait_dice=atk_trait_dice, def_trait_dice=def_trait_dice)
             self.game.battles.append(battle)
+            if raider_def:
+                foe = 'Frontier raiders'
+            else:
+                foe = self.game.nations[enemy.nation].name
             self.game.log(turn,
                 f"[WAR]  Battle at ({nx},{ny}): {self.n.name} vs "
-                f"{self.game.nations[enemy.nation].name} > "
+                f"{foe} > "
                 f"{'WIN' if winner==self.n.idx else 'LOSS'}",
                 self.n.idx)
 
             if winner == self.n.idx:
-                # Conquer tile
-                self._conquer_tile(target_t, army, turn)
                 if not enemy.is_alive():
-                    self._remove_army(enemy, self.game.nations[enemy.nation])
+                    if raider_def:
+                        self.game._remove_frontier_raider(enemy)
+                    else:
+                        self._remove_army(enemy, self.game.nations[enemy.nation])
+                if not (raider_def and target_t.owner < 0):
+                    self._conquer_tile(target_t, army, turn)
                 army.x, army.y = nx, ny
                 target_t.armies.append(army)
                 target_t.army = army
