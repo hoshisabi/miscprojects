@@ -20,6 +20,7 @@ def run_cli(*args):
         [PYTHON, str(CLI)] + list(args),
         capture_output=True,
         text=True,
+        encoding='utf-8',   # cli.py writes UTF-8; Windows would decode as cp1252
     )
     return result.returncode, result.stdout, result.stderr
 
@@ -55,6 +56,45 @@ class TestNarrativeRun(unittest.TestCase):
             re.compile(r'\ba [aeiou][a-z]* people', re.IGNORECASE),
             msg='Trait line should use "an" before vowel-led trait names',
         )
+
+
+class TestNarrativeQuery(unittest.TestCase):
+    """Ticket F: `query --from T --to U --format narrative`."""
+
+    def test_window_renders_a_chapter(self):
+        rc, out, err = run_cli('query', '--seed', '1', '--turns', '30',
+                               '--from', '11', '--to', '20', '--format', 'narrative')
+        self.assertEqual(rc, 0, msg=out + err)
+        self.assertEqual(err, '')
+        self.assertIn('A chapter: turns 11–20 of 30.', out)
+        self.assertIn('(Turns 11–20)', out)
+        self.assertNotIn('FINAL STANDING', out)
+        self.assertFalse(out.lstrip().startswith('{'))
+
+    # The errors below exit before the sim runs, so they cost no turns.
+
+    def test_needs_a_window(self):
+        rc, out, _ = run_cli('query', '--seed', '1', '--turns', '5000', '--format', 'narrative')
+        self.assertNotEqual(rc, 0)
+        self.assertIn('needs --from and/or --to', out)
+
+    def test_to_past_turns_is_an_error(self):
+        rc, out, _ = run_cli('query', '--seed', '1', '--turns', '50', '--to', '60',
+                             '--format', 'narrative')
+        self.assertNotEqual(rc, 0)
+        self.assertIn('--to 60 is after --turns 50', out)
+
+    def test_from_past_turns_is_an_error(self):
+        rc, out, _ = run_cli('query', '--seed', '1', '--turns', '50', '--from', '60',
+                             '--format', 'narrative')
+        self.assertNotEqual(rc, 0)
+        self.assertIn('is empty', out)
+
+    def test_selector_with_narrative_is_an_error(self):
+        rc, out, _ = run_cli('query', '--seed', '1', '--turns', '5000', '--events',
+                             '--from', '10', '--format', 'narrative')
+        self.assertNotEqual(rc, 0)
+        self.assertIn('only applies to the default query', out)
 
 
 if __name__ == '__main__':
