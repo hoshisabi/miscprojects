@@ -19,7 +19,7 @@ implementation cost and not dependency order.
 
 | Rank | Idea | One-line |
 |------|------|----------|
-| 1 | Frontier reclaim / barbarian pressure | Empty land pushes back |
+| 1 | Frontier reclaim / barbarian pressure | Empty land pushes back — **Phase 1 pilot greenlit** (raiders; Vesper ticket I) |
 | 2 | River / road choke corridors | A few tiles matter more than paint |
 | 3 | Tribute without vassal enum | Beaten nations pay; default → rebel |
 | 4 | Mercenary free companies | Armies peel off for gold |
@@ -31,6 +31,10 @@ implementation cost and not dependency order.
 ---
 
 ## 1. Frontier reclaim / barbarian pressure
+
+**Status (2026-10-13).** Phase 1 pilot greenlit — raider incursions only;
+see `DECISIONS.md` same date and Vesper `TICKETS_2026-10-13-frontier.md`.
+Phase 2 (proto-nations) not started.
 
 **Want.** Neutral tiles that have sat empty long enough (post-bleed,
 post-elimination, or never claimed) occasionally spawn a short-lived

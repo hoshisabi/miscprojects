@@ -68,7 +68,36 @@ still queued.
 
 **Candidates (not greenlit).** Eight further gameplay ideas ranked by
 want are in `CANDIDATES.md` (2026-10-13). Try-and-keep-what-feels-right;
-nothing there jumps the A→D / granary / F→G→H queue.
+nothing there jumps the A→D / granary / F→G→H queue except the pilot
+below.
+
+---
+
+## 2026-10-13 — Frontier reclaim pilot (Phase 1: raider incursions)
+
+**Context.** CANDIDATES #1 ranked first. Hollow-empire bleed leaves quiet
+grey rim; rebellion already owns slot-revival drama. Proto-nations on the
+frontier would steal that story.
+
+**Decision — pilot greenlit, default off.** Phase 1 only:
+
+- Track `Tile.neutral_vacant_turns` while `owner == -1`; reset on claim.
+- After `FRONTIER_NEUTRAL_TURNS` (default 28, > neglect abandon), eligible
+  **frontier** neutrals (8-adjacent to a living nation) may spawn a small
+  **frontier raider** army (`nation_idx == -1`, `frontier_raider` flag).
+  TTL disband; global cap on live raiders.
+- Keys in `balance.json5`; **`FRONTIER_RECLAIM_ENABLED` defaults false**.
+- Log: `Frontier raiders emerge near (x,y).` Chronicle honesty > clever AI.
+- **Not in Phase 1:** proto-nations, slot use, trade/diplomacy for raiders.
+
+**Delegation.** Vesper: Ticket I (`~/dev/agents/vesper/TICKETS_2026-10-13-frontier.md`)
+after ticket F. Tally: neutral/frontier tile baselines and post-enable spawn
+counts. Rowan: reader on bleed-heavy run with switch on. Wren: optional
+`--notable` hook.
+
+**Kill criterion.** If enabled runs read as random noise (Rowan critic) or
+spawn rate is zero everywhere with switch on (Tally table), fix or shelve
+before Phase 2. Does not unblock B/C/D or granary code.
 
 ---
 
