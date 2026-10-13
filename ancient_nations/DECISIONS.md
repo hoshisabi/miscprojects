@@ -66,6 +66,10 @@ army-strength cap. Push back in mail before anyone codes this.
 **Not decided today:** succession-that-bruises (#4) policy turn —
 still queued.
 
+**Candidates (not greenlit).** Eight further gameplay ideas ranked by
+want are in `CANDIDATES.md` (2026-10-13). Try-and-keep-what-feels-right;
+nothing there jumps the A→D / granary / F→G→H queue.
+
 ---
 
 ## 2026-10-11 — Trade sinks before trade rules; measurement is in
