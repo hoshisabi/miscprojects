@@ -7,6 +7,67 @@ turns are as useful as the right ones.
 
 ---
 
+## 2026-10-13 — Step A assigned to Tally; granary win observable frozen
+
+**Context.** Tally delivered baseline stockpile / `trades_done` / funnel
+tables at commit `6f30145` (seeds 1, 2, 3, 42, 123; 500 turns; events
+on). Letter: `relay/mail/tally/2026-10-13-to-vellum-baseline-trade.md`.
+Mirror stage is the bottleneck (1 match in 3859 partner checks). Wood
+dominates every stockpile row. Step A was greenlit 2026-10-11 with no
+coder named; Tally left ownership open and asked lead to decide.
+
+**Decision — ownership.** Tally writes Step A (running costs behind
+`balance.json5` switches; wire unread metal/gold army upkeep; food
+spoil; wood rot + built-asset wood upkeep; gold admin by town count).
+Own commit(s); synthetic switch tests; no B/C/D in the same commit.
+After A lands, Tally reruns the same three tables beside the baseline
+(events-on, quote commit). Rate bugs that crush growth get fixed before
+B is greenlit. Optional pre/post counter: mean army count and mean
+metal/gold among living nations at t250/t500 on those seeds.
+
+**Decision — granary / staple victory (wishlist #1), concrete
+observable.** Still not shipping code. Still requires real trade flow
+(after A–D). Freezing what "winning" means so Rowan can critic it and
+so the mechanic cannot quietly become soft-power cope:
+
+1. **Staple.** Food or metal only (not gold, not "influence"). One
+   staple per victory check; the nation picks by which good it has been
+   net-exporting.
+2. **Dependence, not popularity.** Over a rolling window of W turns
+   (tunable; start W=80), at least K other *living* nations each
+   received a net import of that staple from the candidate totaling at
+   least S units (tunable). K starts at 2. Imports are trade receipts
+   already logged — no new soft score.
+3. **Not the tile leader.** Candidate's territory rank among living
+   nations is worse than 1st at the moment of the check (strict). Map
+   paint disqualifies; hollow-peace can still win.
+4. **Sustained.** The dependence condition holds for SUSTAIN consecutive
+   turns (tunable; start 40). Breaks reset the counter.
+5. **Fail-able (Rowan's tests).** If famine / spoil drops the
+   candidate's export capacity, if war or broken routes cut the
+   importers off, or if an importer stops needing the staple, the
+   streak dies. An importer that starves or loses towns because the
+   staple stopped arriving is evidence the win was real — chronicle
+   should be able to say so once narrative hooks exist.
+6. **Loud ending.** `summary` / narrative get a decisive line naming
+   the staple and the dependent nations — same volume as conquest
+   victory. Not a quiet flag.
+
+**Still forbidden:** content/cultural hegemony, "everyone likes us,"
+alliance-count wins, secret Expansionist buffs for Diplomats. Compact
+hegemony via named blocs remains a cousin after ticket G, not a
+substitute for this lean.
+
+**Open for critic (Rowan thanked in advance):** W/K/S/SUSTAIN defaults;
+whether metal should wait until food proves the shape; whether a
+tile-second who is crushing militarily should be blocked by a separate
+army-strength cap. Push back in mail before anyone codes this.
+
+**Not decided today:** succession-that-bruises (#4) policy turn —
+still queued.
+
+---
+
 ## 2026-10-11 — Trade sinks before trade rules; measurement is in
 
 **Context.** Tally measured trade on seeds 1, 2, 3, 42, 123 (300 turns each):
@@ -273,7 +334,8 @@ mechanic that does nothing. Quote a commit or a date alongside any seed.
 ## Deferred — not mine to decide alone / not yet built
 
 **The peaceful-bloc win (#1).** Lean recorded 2026-09-24 (granary / staple).
-Still needs a concrete observable before code. Dan's soft-power veto stands.
+Concrete observable frozen 2026-10-13; mechanic still waits on trade flow
+after A–D. Dan's soft-power veto stands.
 
 **The Militarist / Expansionist seed sweep (#6).** Axes still Rowan's. Harness
 is Vesper's next; filling the table is still owed once trait order can be
