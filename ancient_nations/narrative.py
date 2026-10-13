@@ -397,8 +397,11 @@ def _era_paragraph(era_idx: int, lo: int, hi: int,
     if total_bat == 0:
         body_parts.append("An unusual calm settled over the known world during this period.")
     else:
+        # The window is inclusive, same as the header: Turns 1–100 is 100 turns.
+        span = hi - lo + 1
+        fought = "1 battle was" if total_bat == 1 else f"{total_bat} battles were"
         body_parts.append(
-            f"{total_bat} battles were fought across {hi - lo} turns "
+            f"{fought} fought across {span} {'turn' if span == 1 else 'turns'} "
             f"as the nations jostled for position."
         )
 

@@ -185,6 +185,25 @@ class TestTerritoryLookup(unittest.TestCase):
         self.assertEqual(narrative._dominant_at(st, 30), ('Cirra', 700))
 
 
+class TestEraBattleCount(unittest.TestCase):
+    """The era header is inclusive (Turns 1–100), so the body must count the same way."""
+
+    def test_turn_count_matches_the_inclusive_header(self):
+        out = narrative.render(state(
+            [nation('Aegia', 'Militarist'), nation('Borum', 'Builder')],
+            battles=[{'turn': 10, 'attacker': 'Aegia', 'defender': 'Borum', 'winner': 'Aegia'},
+                     {'turn': 11, 'attacker': 'Aegia', 'defender': 'Borum', 'winner': 'Aegia'}]))
+        self.assertIn('(Turns 1–100)', out)
+        self.assertIn('2 battles were fought across 100 turns', out)
+
+    def test_one_battle_is_singular(self):
+        out = narrative.render(state(
+            [nation('Aegia', 'Militarist'), nation('Borum', 'Builder')],
+            battles=[{'turn': 10, 'attacker': 'Aegia', 'defender': 'Borum', 'winner': 'Aegia'}]))
+        self.assertIn('1 battle was fought across 100 turns', out)
+        self.assertNotIn('1 battles', out)
+
+
 if __name__ == '__main__':
     unittest.main()
 
