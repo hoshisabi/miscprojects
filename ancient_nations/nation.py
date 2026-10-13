@@ -314,7 +314,40 @@ class Nation:
 
     def army_upkeep_cost(self):
         n = self.total_armies()
-        return {RES_FOOD: ARMY_UPKEEP_FOOD * n}
+        cost = {RES_FOOD: ARMY_UPKEEP_FOOD * n}
+        if RUNNING_COSTS_ENABLED:
+            cost[RES_METAL] = ARMY_UPKEEP_METAL * n
+            cost[RES_GOLD]  = ARMY_UPKEEP_GOLD * n
+        return cost
+
+    def holdings_upkeep_cost(self, world=None):
+        """Wood on roads, castles and towns; gold to administer towns.
+
+        Without a world the per-tile wood is skipped (towns still count).
+        """
+        if not RUNNING_COSTS_ENABLED:
+            return {}
+        wood = WOOD_UPKEEP_TOWN * len(self.towns)
+        if world is not None:
+            for x, y in self.tiles:
+                tile = world.t(x, y)
+                if tile.road:
+                    wood += WOOD_UPKEEP_ROAD
+                if tile.entity == 'castle':
+                    wood += WOOD_UPKEEP_CASTLE
+        return {RES_WOOD: wood,
+                RES_GOLD: GOLD_ADMIN_PER_TOWN * len(self.towns)}
+
+    def spoilage(self):
+        """Share of the stock above each threshold lost this turn."""
+        if not RUNNING_COSTS_ENABLED:
+            return {}
+        return {
+            RES_FOOD: FOOD_SPOIL_RATE
+                      * max(0, self.res[RES_FOOD] - FOOD_SPOIL_THRESHOLD),
+            RES_WOOD: WOOD_ROT_RATE
+                      * max(0, self.res[RES_WOOD] - WOOD_ROT_THRESHOLD),
+        }
 
     # ── resource collection ────────────────────────────────────────────────
     def collect_resources(self, world, season_food_mul=1.0):
@@ -363,9 +396,12 @@ class Nation:
                             mul = 1.0
                         self.res[res] += d[res] * 0.2 * eff * mul
 
-    def pay_upkeep(self):
-        cost = self.army_upkeep_cost()
-        for r, v in cost.items():
+    def pay_upkeep(self, world=None):
+        costs = [self.army_upkeep_cost(), self.holdings_upkeep_cost(world)]
+        for cost in costs:
+            for r, v in cost.items():
+                self.res[r] = max(0, self.res[r] - v)
+        for r, v in self.spoilage().items():
             self.res[r] = max(0, self.res[r] - v)
         return True
 

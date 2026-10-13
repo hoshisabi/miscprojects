@@ -18,8 +18,27 @@
   "ARMY_COST_GOLD":  15,   // only for levels > 3
 
   "ARMY_UPKEEP_FOOD":  2,
-  "ARMY_UPKEEP_METAL": 1,
-  "ARMY_UPKEEP_GOLD":  1,
+  "ARMY_UPKEEP_METAL": 1,   // charged only while RUNNING_COSTS_ENABLED
+  "ARMY_UPKEEP_GOLD":  0.1, // charged only while RUNNING_COSTS_ENABLED; was 1 and unread (1 zeroes gold in 11/12 seeds)
+
+  // ── Running costs (trade Step A) ────────────────────────────────────────────
+  // Master switch: false reproduces the pre-Step-A economy (food-only army
+  // upkeep, no spoil, no rot, no administration). Rates of 0 turn one sink off.
+  "RUNNING_COSTS_ENABLED": true,
+
+  // Spoil / rot: each turn this share of the stock above the threshold is lost.
+  "FOOD_SPOIL_RATE":      0.005,
+  "FOOD_SPOIL_THRESHOLD": 2000,
+  "WOOD_ROT_RATE":        0.02,
+  "WOOD_ROT_THRESHOLD":   300,
+
+  // Wood upkeep per turn on what a nation has built.
+  "WOOD_UPKEEP_ROAD":   0.1,   // per owned road tile
+  "WOOD_UPKEEP_CASTLE": 1.0,   // per owned castle tile
+  "WOOD_UPKEEP_TOWN":   2.0,   // per town
+
+  // Gold cost of administration, per town per turn.
+  "GOLD_ADMIN_PER_TOWN": 0.5,
 
   // ── Development Costs ───────────────────────────────────────────────────────
   "DEV_FARM_WOOD":    20,

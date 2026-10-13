@@ -158,7 +158,7 @@ class Game:
         # 4. Pay upkeep
         for n in self.nations:
             if not n.alive: continue
-            n.pay_upkeep()
+            n.pay_upkeep(self.world)
             # If food runs out, armies starve
             if n.res[RES_FOOD] <= 0:
                 if n.armies:
