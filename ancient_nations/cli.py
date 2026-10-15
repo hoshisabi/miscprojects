@@ -14,6 +14,7 @@ Usage
   python cli.py query --seed 42 --turns 100 --region 3,4
   python cli.py query --seed 42 --turns 800 --events --from 600   # events with turn >= 600
   python cli.py query --seed 42 --turns 800 --events --from 400 --to 600  # 400 <= turn <= 600
+  python cli.py query --seed 42 --turns 800 --from 400 --to 600 --format narrative  # prose chapter
   python cli.py stream --seed 42 --turns 50            # NDJSON one line per turn
   python cli.py stream --seed 42 --turns 200 --from 150 --to 180  # emit turns 150–180
   python cli.py battles --seed 42 --turns 200
@@ -84,14 +85,44 @@ def cmd_run(args):
         _print(out, args.pretty)
 
 
+def _narrative_window(args, from_turn, to_turn):
+    """Window for `query --format narrative`, checked before any sim work.
+
+    Needs at least one bound; the missing side is turn 1 or --turns. Only the
+    default query narrates, so a --tile/--nation/--region/--events selector
+    is an error rather than silently ignored.
+    """
+    pretty = args.pretty
+    if args.tile or args.nation or args.region or args.events:
+        _error({'error': '--format narrative only applies to the default query'}, pretty)
+    if from_turn is None and to_turn is None:
+        _error({'error': '--format narrative needs --from and/or --to'}, pretty)
+    lo = from_turn if from_turn is not None else 1
+    hi = to_turn if to_turn is not None else args.turns
+    if hi > args.turns:
+        _error({'error': f'--to {hi} is after --turns {args.turns}'}, pretty)
+    if hi < lo:
+        _error({'error': f'turn window {lo}–{hi} is empty'}, pretty)
+    return lo, hi
+
+
 def cmd_query(args):
     """Query specific aspect of game state after N turns."""
     from_turn, to_turn = _turn_bounds(args)
+    narrate = getattr(args, 'format', 'json') == 'narrative'
+    if narrate:
+        lo, hi = _narrative_window(args, from_turn, to_turn)
     s = _open_session(args)
     s.run_turns(args.turns)
     g = s.game
 
-    if args.tile:
+    if narrate:
+        import narrative
+        out = s.snapshot()
+        out['battles'] = [battle_dict(b, [n.name for n in g.nations]) for b in g.battles]
+        sys.stdout.write(narrative.render_span(out, lo, hi) + '\n')
+
+    elif args.tile:
         x, y = map(int, args.tile.split(','))
         if not g.world.in_bounds(x, y):
             _error({'error': f'Tile ({x},{y}) out of bounds'}, args.pretty)
@@ -344,6 +375,8 @@ def build_parser():
                     help='With default query or --events: only include world events with turn >= T')
     sq.add_argument('--to', dest='to_turn', type=int, default=None, metavar='U',
                     help='With default query or --events: only include world events with turn <= U')
+    sq.add_argument('--format', choices=['json', 'narrative'], default='json',
+                    help='narrative: prose chapter for the --from/--to window (default: json)')
 
     # stream
     st = sub.add_parser('stream', parents=[shared],

@@ -242,6 +242,11 @@ def _dominant_at(state: dict, turn: int) -> tuple[str, int] | None:
     return top, top_t
 
 
+def _fronts(era_battles: list) -> set:
+    """Distinct warring pairs, order-independent."""
+    return {tuple(sorted([b['attacker'], b['defender']])) for b in era_battles}
+
+
 def _describe_era_conflicts(era_battles: list, state: dict, hi: int) -> str:
     """Summarise the wars of an era in a sentence or two."""
     if not era_battles:
@@ -368,7 +373,14 @@ def _describe_era_events(era_events: list) -> str:
 
 def _era_paragraph(era_idx: int, lo: int, hi: int,
                    state: dict, battles: list, events: list,
-                   used_names: dict | None = None) -> str:
+                   used_names: dict | None = None,
+                   name_leader: bool = False) -> str:
+    """One era: header, battles, events, deaths.
+
+    The conflict sentence names the territory leader only when there were
+    several fronts. With name_leader, an era that didn't get that sentence
+    (calm, or a single war) still says who held the most land at `hi`.
+    """
     era_bat = _battles_in(battles, lo, hi)
     era_evt = _events_in(events, lo, hi)
 
@@ -397,8 +409,11 @@ def _era_paragraph(era_idx: int, lo: int, hi: int,
     if total_bat == 0:
         body_parts.append("An unusual calm settled over the known world during this period.")
     else:
+        # The window is inclusive, same as the header: Turns 1–100 is 100 turns.
+        span = hi - lo + 1
+        fought = "1 battle was" if total_bat == 1 else f"{total_bat} battles were"
         body_parts.append(
-            f"{total_bat} battles were fought across {hi - lo} turns "
+            f"{fought} fought across {span} {'turn' if span == 1 else 'turns'} "
             f"as the nations jostled for position."
         )
 
@@ -406,6 +421,11 @@ def _era_paragraph(era_idx: int, lo: int, hi: int,
     conflict = _describe_era_conflicts(era_bat, state, hi)
     if conflict:
         body_parts.append(conflict)
+
+    if name_leader and len(_fronts(era_bat)) <= 1:
+        lead = _dominant_at(state, hi)
+        if lead:
+            body_parts.append(f"By turn {hi}, {lead[0]} held the most land: {lead[1]} tiles.")
 
     # World events
     evt_prose = _describe_era_events(era_evt)
@@ -423,14 +443,17 @@ def _era_paragraph(era_idx: int, lo: int, hi: int,
     return f"{header}\n{border}\n{body}"
 
 
+def _era_size(turns: int) -> int:
+    """Turns per era in the full chronicle: aim for 4–8 eras."""
+    era_size = max(50, (turns // 6 // 50) * 50) if turns > 200 else 100
+    return min(era_size, 200)
+
+
 def _chronicle(state: dict) -> str:
     battles = state.get('battles', [])
     events  = state.get('events', [])
     turns   = state['turn']
-
-    # Choose era size: aim for 4–8 eras
-    era_size = max(50, (turns // 6 // 50) * 50) if turns > 200 else 100
-    era_size  = min(era_size, 200)
+    era_size = _era_size(turns)
 
     eras      = []
     used_names: dict[str, int] = {}
@@ -528,3 +551,36 @@ def render(state: dict) -> str:
         _closing(state, battles),
     ]
     return '\n\n'.join(s for s in sections if s.strip())
+
+
+def render_span(state: dict, lo: int, hi: int) -> str:
+    """
+    Render turns lo..hi (inclusive) as one chapter: battles, events and deaths
+    inside the window, and who held the most land at `hi`.
+
+    No founding block and no FINAL STANDING: those describe the whole game.
+    A window covering the whole game (lo == 1, hi == state['turn']) returns
+    the full render() instead.
+
+    state is the same end-of-game dict render() takes; it must reach `hi`.
+    Territory before the final turn comes from the sampled territory_log, so
+    the leader at `hi` may be as of the nearest earlier sample.
+    """
+    if hi < lo:
+        raise ValueError(f'span ends at {hi}, before it starts at {lo}')
+    if hi > state['turn']:
+        raise ValueError(f'span ends at {hi}, after the game at {state["turn"]}')
+    if lo <= 1 and hi == state['turn']:
+        return render(state)
+
+    # Same era index the full chronicle would give turn lo, so the name agrees.
+    idx = (max(lo, 1) - 1) // _era_size(state['turn'])
+    title = (
+        f"ANCIENT NATIONS — Seed {state['seed']}\n"
+        f"{'=' * 44}\n"
+        f"A chapter: turns {lo}–{hi} of {state['turn']}."
+    )
+    chapter = _era_paragraph(idx, lo, hi, state,
+                             state.get('battles', []), state.get('events', []),
+                             name_leader=True)
+    return f"{title}\n\n{chapter}"

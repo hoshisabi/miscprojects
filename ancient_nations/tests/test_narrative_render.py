@@ -185,6 +185,109 @@ class TestTerritoryLookup(unittest.TestCase):
         self.assertEqual(narrative._dominant_at(st, 30), ('Cirra', 700))
 
 
+class TestEraBattleCount(unittest.TestCase):
+    """The era header is inclusive (Turns 1–100), so the body must count the same way."""
+
+    def test_turn_count_matches_the_inclusive_header(self):
+        out = narrative.render(state(
+            [nation('Aegia', 'Militarist'), nation('Borum', 'Builder')],
+            battles=[{'turn': 10, 'attacker': 'Aegia', 'defender': 'Borum', 'winner': 'Aegia'},
+                     {'turn': 11, 'attacker': 'Aegia', 'defender': 'Borum', 'winner': 'Aegia'}]))
+        self.assertIn('(Turns 1–100)', out)
+        self.assertIn('2 battles were fought across 100 turns', out)
+
+    def test_one_battle_is_singular(self):
+        out = narrative.render(state(
+            [nation('Aegia', 'Militarist'), nation('Borum', 'Builder')],
+            battles=[{'turn': 10, 'attacker': 'Aegia', 'defender': 'Borum', 'winner': 'Aegia'}]))
+        self.assertIn('1 battle was fought across 100 turns', out)
+        self.assertNotIn('1 battles', out)
+
+
+class TestRenderSpan(unittest.TestCase):
+    """Ticket F: a turn window reads as a chapter, not a filtered dump."""
+
+    LOG = [{'turn': t, 'territory': {'Aegia': 100 + t, 'Borum': 50, 'Cirra': 40}}
+           for t in range(10, 200, 10)]
+
+    def _state(self, battles=(), events=(), nations=None, log=None):
+        nations = nations or [nation('Aegia', 'Militarist', territory=400),
+                              nation('Borum', 'Builder', territory=60),
+                              nation('Cirra', 'Zealot', territory=30)]
+        return state(nations, battles=battles, events=events, turn=200,
+                     territory_log=self.LOG if log is None else log)
+
+    def test_only_the_window_is_narrated(self):
+        st = self._state(
+            battles=[{'turn': 35, 'attacker': 'Aegia', 'defender': 'Borum', 'winner': 'Aegia'},
+                     {'turn': 150, 'attacker': 'Borum', 'defender': 'Cirra', 'winner': 'Cirra'}],
+            events=[event('drought', turn=40, food_lost=10, nations_affected=1),
+                    event('flood', turn=120, tiles_flooded=4)])
+        out = narrative.render_span(st, 30, 80)
+        self.assertIn('(Turns 30–80)', out)
+        self.assertIn('1 battle was fought across 51 turns', out)
+        self.assertIn('Drought', out)
+        self.assertNotIn('Floods', out)
+        self.assertNotIn('Cirra held the upper hand', out)
+
+    def test_no_founding_block_or_final_standing(self):
+        out = narrative.render_span(self._state(), 30, 80)
+        self.assertNotIn('rose from the wilderness', out)
+        self.assertNotIn('FINAL STANDING', out)
+        self.assertIn('A chapter: turns 30–80 of 200.', out)
+
+    def test_whole_game_window_is_the_full_chronicle(self):
+        st = self._state()
+        self.assertEqual(narrative.render_span(st, 1, 200), narrative.render(st))
+
+    def test_names_the_land_leader_at_the_end_of_a_calm_window(self):
+        """No battles, so the conflict sentence can't carry it."""
+        out = narrative.render_span(self._state(), 30, 80)
+        self.assertIn('By turn 80, Aegia held the most land: 180 tiles.', out)
+
+    def test_leader_between_samples_uses_the_nearest_earlier_one(self):
+        out = narrative.render_span(self._state(), 30, 85)
+        self.assertIn('By turn 85, Aegia held the most land: 180 tiles.', out)
+
+    def test_silent_when_nobody_leads(self):
+        log = [{'turn': 80, 'territory': {'Aegia': 50, 'Borum': 50, 'Cirra': 40}}]
+        out = narrative.render_span(self._state(log=log), 30, 80)
+        self.assertNotIn('held the most land', out)
+        self.assertNotIn('dominant force', out)
+
+    def test_leader_is_named_once_when_several_fronts_already_name_it(self):
+        st = self._state(battles=[
+            {'turn': 40, 'attacker': 'Aegia', 'defender': 'Borum', 'winner': 'Aegia'},
+            {'turn': 41, 'attacker': 'Borum', 'defender': 'Cirra', 'winner': 'Borum'}])
+        out = narrative.render_span(st, 30, 80)
+        self.assertIn('Aegia proved the dominant force, holding 180 tiles by turn 80', out)
+        self.assertNotIn('held the most land', out)
+
+    def test_names_deaths_inside_the_window_only(self):
+        st = self._state(nations=[
+            nation('Aegia', 'Militarist', territory=400),
+            nation('Borum', 'Builder', territory=0, alive=False, death_turn=60,
+                   absorbed_by='Aegia', towns=[], capital=None),
+            nation('Cirra', 'Zealot', territory=0, alive=False, death_turn=150,
+                   towns=[], capital=None)])
+        out = narrative.render_span(st, 30, 80)
+        self.assertIn('Borum fell in turn 60, absorbed by Aegia.', out)
+        self.assertNotIn('Cirra fell', out)
+
+    def test_era_name_agrees_with_the_full_chronicle(self):
+        """Turn 30 sits in the first era of a 200-turn chronicle."""
+        out = narrative.render_span(self._state(), 30, 80)
+        self.assertIn('The Age of Founding (Turns 30–80)', out)
+        out = narrative.render_span(self._state(), 120, 150)
+        self.assertIn('The Quiet Age (Turns 120–150)', out)
+
+    def test_window_past_the_game_is_refused(self):
+        with self.assertRaises(ValueError):
+            narrative.render_span(self._state(), 30, 250)
+        with self.assertRaises(ValueError):
+            narrative.render_span(self._state(), 80, 30)
+
+
 if __name__ == '__main__':
     unittest.main()
 
