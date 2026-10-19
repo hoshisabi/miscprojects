@@ -7,6 +7,19 @@ turns are as useful as the right ones.
 
 ---
 
+## 2026-10-18 — Era voice (#3) shipped
+
+**Context.** Wren's session check-in ask: `query --from T --to U` that *tells*
+who was winning, not only filtered events. Design pinned 2026-09-24 #3.
+Vesper shipped it as ticket F (`9891a3c`, merged in PR #3 as
+`8f5192a`): `narrative.render_span` + `query --format narrative`.
+
+**Decision.** #3 is done. Open-stack bullet and deferred summaries that still
+say "prose unbuilt" are stale; this entry is the standing record. Named
+alliances (#2) may proceed when scheduled.
+
+---
+
 ## 2026-10-13 — Step A assigned to Tally; granary win observable frozen
 
 **Context.** Tally delivered baseline stockpile / `trades_done` / funnel
@@ -174,7 +187,7 @@ Vesper keeps independent review.
 **Order (care order preserved where it does not fight the graph):**
 
 1. Soften Pacifist-on-Expansionist (#5) — shipped today; see entry below.
-2. Era voice on `--from`/`--to` (#3) — Vesper; design pinned below.
+2. Era voice on `--from`/`--to` (#3) — shipped 2026-10-13 (ticket F / PR #3); see 2026-10-18 entry.
 3. Named alliances / blocs (#2) — Vesper after #3; ISSUES.md #13 is the
    starting sketch, not scripture. Thresholds greenlit below.
 4. Alternate-history sweep (#6) — Vesper builds the harness next to
@@ -379,8 +392,7 @@ pinned for a run. Belongs next to the tests, not in a note.
 **Named alliances (#2).** Design greenlit 2026-09-24; implementation ticketed
 to Vesper after era voice.
 
-**Era voice (#3).** Plumbing (`--from`/`--to`) shipped 2026-09-23; prose still
-unbuilt — ticketed to Vesper.
+**Era voice (#3).** Shipped 2026-10-13 (ticket F / PR #3). See 2026-10-18 entry.
 
 **Open product ask from Wren:** the server (ISSUES.md #12). Later per Rowan #7;
 era prose and win/alliance work first.
