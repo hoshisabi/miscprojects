@@ -269,6 +269,7 @@ class Game:
             tile.entity = None
         tile.road = False
         tile.neutral_vacant_turns = 0
+        tile.was_released = True
 
     def _abandon_tile_to_neutral(self, nation, tile, t):
         self._release_tile(nation, tile)
@@ -286,9 +287,10 @@ class Game:
         self._tick_frontier_raider_ai(t)
 
     def _tick_neutral_vacancy(self):
+        # Never-owned wilderness stays at 0. The clock starts at _release_tile.
         for row in self.world.tiles:
             for tile in row:
-                if tile.owner == -1 and tile.is_land():
+                if tile.owner == -1 and tile.is_land() and tile.was_released:
                     tile.neutral_vacant_turns += 1
 
     def _frontier_raider_count(self):
@@ -313,12 +315,16 @@ class Game:
                 return True
         return False
 
+    def _tile_has_living_nation_army(self, tile):
+        return any(a.is_alive() and a.nation >= 0 for a in tile.armies)
+
     def _tick_frontier_spawns(self, t):
-        if self._frontier_raider_count() >= FRONTIER_MAX_RAIDERS:
+        live = self._frontier_raider_count()
+        if live >= FRONTIER_MAX_RAIDERS:
             return
         for row in self.world.tiles:
             for tile in row:
-                if self._frontier_raider_count() >= FRONTIER_MAX_RAIDERS:
+                if live >= FRONTIER_MAX_RAIDERS:
                     return
                 if tile.owner != -1 or not tile.is_land():
                     continue
@@ -328,9 +334,12 @@ class Game:
                     continue
                 if any(a.frontier_raider for a in tile.armies):
                     continue
+                if self._tile_has_living_nation_army(tile):
+                    continue
                 if random.random() >= FRONTIER_SPAWN_CHANCE:
                     continue
                 self._spawn_frontier_raider(tile, t)
+                live += 1
 
     def _spawn_frontier_raider(self, tile, t):
         army = Army(tile.x, tile.y, -1, level=FRONTIER_RAIDER_LEVEL)
@@ -362,10 +371,14 @@ class Game:
                 self._step_raider(army, target_tile.x, target_tile.y)
 
     def _pick_raider_target(self, raider):
-        """Adjacent nation army (weakest) or adjacent nation-owned land to step onto."""
+        """Same-tile or adjacent nation army (weakest), else adjacent owned land."""
         cx, cy = raider.x, raider.y
         enemies = []
         move_tiles = []
+        here = self.world.t(cx, cy)
+        for a in here.armies:
+            if a is not raider and a.is_alive() and a.nation >= 0:
+                enemies.append((a.strength, a, here))
         for nb in self.world.neighbors8(cx, cy):
             if not nb.is_land():
                 continue
@@ -383,6 +396,8 @@ class Game:
         return None, None
 
     def _step_raider(self, army, nx, ny):
+        if army.x == nx and army.y == ny:
+            return
         old = self.world.t(army.x, army.y)
         if army in old.armies:
             old.armies.remove(army)
@@ -413,9 +428,9 @@ class Game:
             self.ai[defender.nation]._remove_army(defender, def_nation)
         if not raider.is_alive():
             self._remove_frontier_raider(raider)
-        elif winner >= 0 and raider.is_alive():
-            # Repelled — stay on tile
-            pass
+        elif winner < 0:
+            # Press the fought tile (no ownership paint in Phase 1).
+            self._step_raider(raider, tile.x, tile.y)
 
     def _tick_famine_towns(self, t):
         """National food stress causes towns to lose levels over time."""

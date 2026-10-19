@@ -24,7 +24,7 @@
   // ── Running costs (trade Step A) ────────────────────────────────────────────
   // Master switch: false reproduces the pre-Step-A economy (food-only army
   // upkeep, no spoil, no rot, no administration). Rates of 0 turn one sink off.
-  "RUNNING_COSTS_ENABLED": true,
+  "RUNNING_COSTS_ENABLED": false,
 
   // Spoil / rot: each turn this share of the stock above the threshold is lost.
   "FOOD_SPOIL_RATE":      0.005,
