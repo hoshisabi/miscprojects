@@ -35,7 +35,8 @@ class Tile:
         'armies',         # list of Army objs
         'captured_turn',
         'territory_neglect',  # turns this tile was owned but outside all friendly town radii
-        'neutral_vacant_turns',  # turns owner == -1 (frontier reclaim)
+        'neutral_vacant_turns',  # turns owner == -1 after release (frontier reclaim)
+        'was_released',  # True after _release_tile; never-owned wilderness stays False
     ]
 
     def __init__(self, x, y):
@@ -54,6 +55,7 @@ class Tile:
         self.captured_turn = -1
         self.territory_neglect = 0
         self.neutral_vacant_turns = 0
+        self.was_released = False
 
     def is_land(self):
         return self.terrain != TERRAIN_OCEAN

@@ -58,9 +58,16 @@ def town_dict(t):
     }
 
 
+def _nation_label(idx, nation_names, *, negative='Neutral'):
+    """Map nation index to a display name. idx < 0 is never nation_names[-1]."""
+    if idx < 0:
+        return negative
+    return nation_names[idx]
+
+
 def army_dict(a, nation_names):
     if a.nation < 0 or getattr(a, 'frontier_raider', False):
-        nname = 'Frontier'
+        nname = 'Frontier raiders'
     else:
         nname = nation_names[a.nation]
     return {
@@ -98,9 +105,12 @@ def battle_dict(b, nation_names):
     return {
         'turn':       b.turn,
         'location':   [b.x, b.y],
-        'attacker':   nation_names[b.atk_nation],
-        'defender':   nation_names[b.def_nation] if b.def_nation >= 0 else 'Neutral',
-        'winner':     nation_names[b.winner] if b.winner >= 0 else 'Neutral',
+        'attacker':   _nation_label(
+            b.atk_nation, nation_names, negative='Frontier raiders'),
+        'defender':   _nation_label(
+            b.def_nation, nation_names, negative='Neutral'),
+        'winner':     _nation_label(
+            b.winner, nation_names, negative='Frontier raiders'),
         'atk_losses': b.atk_losses,
         'def_losses': b.def_losses,
         'notes':      b.notes,

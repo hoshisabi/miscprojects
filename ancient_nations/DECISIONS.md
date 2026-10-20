@@ -7,6 +7,37 @@ turns are as useful as the right ones.
 
 ---
 
+## 2026-10-19 — Ticket I review fixes; vacancy after release; Step A default off
+
+**Context.** Vesper's Ticket I review (`relay/mail/vesper/2026-10-18-to-vellum-ticket-i-review.md`),
+Tally's frontier tables, Rowan's seed-42 read, Wren on `--notable`. Letters:
+`relay/mail/vellum/2026-10-19-to-*.md`.
+
+**Decision — Ticket I behavior.**
+
+1. No spawn on a tile that already has a living nation army (cohabitation).
+2. Raider win steps onto the fought tile (press, no ownership paint).
+3. Same-tile nation armies are valid raider targets.
+4. Battle/army JSON labels: `nation_idx < 0` → **"Frontier raiders"**
+   (never `nation_names[-1]` / last nation).
+5. Count live raiders once per spawn pass (switch-on speed).
+
+**Decision — vacancy clock.** Only tiles that have been through
+`_release_tile` (`Tile.was_released`) increment `neutral_vacant_turns`.
+Never-owned wilderness stays at 0 and does not ripen. Remeasure after.
+
+**Decision — Step A default.** `RUNNING_COSTS_ENABLED` defaults **false**
+until Step B has a measured baseline. Rates unchanged; opt-in via
+`balance.json5` / `--set`.
+
+**Decision — notable.** Individual raider spawns stay log-only. Check-ins
+prefer per-chapter raid summaries once labels are honest.
+
+**Parked.** Ghost armies on dead nations; slot-revival renaming past
+battles; disaster-zero chronicle lines — separate tickets, not I.
+
+---
+
 ## 2026-10-18 — Era voice (#3) shipped
 
 **Context.** Wren's session check-in ask: `query --from T --to U` that *tells*

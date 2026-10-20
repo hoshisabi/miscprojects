@@ -144,8 +144,11 @@ class Battle:
         self.notes       = notes
 
     def summary(self, nation_names):
-        an = nation_names[self.atk_nation]
-        dn = nation_names[self.def_nation] if self.def_nation>=0 else 'Neutral'
-        wn = nation_names[self.winner] if self.winner>=0 else 'Neutral'
+        an = (nation_names[self.atk_nation] if self.atk_nation >= 0
+              else 'Frontier raiders')
+        dn = (nation_names[self.def_nation] if self.def_nation >= 0
+              else 'Neutral')
+        wn = (nation_names[self.winner] if self.winner >= 0
+              else 'Frontier raiders')
         return (f"T{self.turn:4d} | {an:12s} → {dn:12s} | "
                 f"Winner:{wn:12s} | Losses: {self.atk_losses}/{self.def_losses}")
